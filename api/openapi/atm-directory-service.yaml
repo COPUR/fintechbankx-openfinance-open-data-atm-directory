@@ -12,6 +12,7 @@ paths:
       operationId: listAtms
       tags:
         - ATMs
+      security: []
       parameters:
         - $ref: '#/components/parameters/InteractionId'
         - $ref: '#/components/parameters/AuthorizationOptional'
