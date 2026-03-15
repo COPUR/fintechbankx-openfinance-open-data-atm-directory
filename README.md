@@ -1,2 +1,7 @@
-# openfinance-atm-directory-service
-DDD/EDA open_finance capability (svc-of-atm-directory) owner:Open Data Squad wave:1
+# ATM Directory Service
+
+Repository stub for the ATM open data microservice.
+
+- Runtime: Java 23 + Gradle
+- Architecture: Hexagonal (Ports & Adapters)
+
