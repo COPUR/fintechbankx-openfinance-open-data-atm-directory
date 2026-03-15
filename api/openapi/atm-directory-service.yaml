@@ -9,6 +9,7 @@ paths:
   /atms:
     get:
       summary: List ATMs
+      security: []
       operationId: listAtms
       tags:
         - ATMs
