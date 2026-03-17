@@ -6,27 +6,9 @@ Public Open Finance ATM directory service.
 - Architecture: Hexagonal (Ports & Adapters)
 - Domain: Open Data / ATM Directory
 
-## Implemented Slice (Wave 1)
 
-Endpoint:
 
-- `GET /open-finance/v1/atms`
+## Publication Guardrails
 
-Capabilities:
-
-- Optional geo filtering with `lat`, `long`, `radius`
-- Public endpoint (`security: []`) with mandatory `X-FAPI-Interaction-ID`
-- ETag support with `If-None-Match` -> `304 Not Modified`
-- Standardized error response for invalid requests
-
-## Test Coverage
-
-Includes:
-
-- Domain and application unit tests
-- Controller tests
-- Integration tests
-- OpenAPI contract test
-- UAT-style ETag flow test
-
-Coverage gate target: `>=85%` line coverage (JaCoCo)
+- Follow [Publication Guardrails](docs/publication/PUBLICATION_GUARDRAILS.md).
+- Do not commit local paths, personal identifiers, or secrets.
