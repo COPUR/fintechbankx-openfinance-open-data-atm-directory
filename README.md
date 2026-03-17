@@ -1,9 +1,10 @@
 # ATM Directory Service
 
-Repository stub for the ATM open data microservice.
+Public Open Finance ATM directory service.
 
 - Runtime: Java 23 + Gradle
 - Architecture: Hexagonal (Ports & Adapters)
+- Domain: Open Data / ATM Directory
 
 
 
