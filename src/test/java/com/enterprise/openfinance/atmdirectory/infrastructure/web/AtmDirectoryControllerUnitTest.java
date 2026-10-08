@@ -230,4 +230,24 @@ class AtmDirectoryControllerUnitTest {
             .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
         org.mockito.Mockito.verifyNoInteractions(atmDirectoryUseCase);
     }
+
+    /** Regression: malformed client input must be a 4xx with the error body, never the catch-all 500. */
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource(delimiter = '|', value = {
+        "/open-finance/v1/atms?lat=1&lat=2&long=55|application/json",
+        "/open-finance/v1/atms?lat=25&long=55&radius=|application/json",
+        "/open-finance/v1/atms?lat=%20&long=55|application/json",
+        "/open-finance/v1/atms?lat=0x1p3&long=55|application/json",
+        "/open-finance/v1/atms?radius=abc|application/json",
+        "/open-finance/v1/atms|application/xml",
+    })
+    void malformedInputIsNeverA500(String url, String accept) throws Exception {
+        when(atmDirectoryUseCase.listAtms(any())).thenReturn(new AtmListResult(List.of(DOWNTOWN)));
+
+        var response = mockMvc.perform(get(url).header("X-FAPI-Interaction-ID", "it-4xx").header("Accept", accept))
+            .andReturn().getResponse();
+
+        assertThat(response.getStatus()).as("%s Accept %s -> %s", url, accept, response.getContentAsString())
+            .isNotEqualTo(500);
+    }
 }
