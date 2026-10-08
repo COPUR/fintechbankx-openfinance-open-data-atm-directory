@@ -8,7 +8,7 @@ import com.enterprise.openfinance.atmdirectory.domain.model.Coordinates;
  */
 public record ListAtmsQuery(Double latitude, Double longitude, Double radiusKm) {
 
-    public static final double DEFAULT_RADIUS_KM = 10.0d;
+    public static final double DEFAULT_RADIUS_KM = 5.0d;
     public static final double MAX_RADIUS_KM = 50.0d;
 
     public ListAtmsQuery {

@@ -62,11 +62,14 @@ class AtmDirectoryServiceTest {
     }
 
     @Test
-    void radiusDefaultsToTenKilometres() {
-        when(atmDirectoryPort.findWithin(any())).thenReturn(List.of(DOWNTOWN, MARINA));
+    void radiusDefaultsToFiveKilometres() {
+        // 3.00 km and 7.01 km due north of downtown: only the first is inside the 5 km default.
+        AtmLocation threeKm = atm("N3", 25.2318, 55.2708, "Dubai");
+        AtmLocation sevenKm = atm("N7", 25.2678, 55.2708, "Dubai");
+        when(atmDirectoryPort.findWithin(any())).thenReturn(List.of(DOWNTOWN, threeKm, sevenKm));
 
         assertThat(service.listAtms(new ListAtmsQuery(25.2048, 55.2708, null)).atms())
-            .extracting(AtmLocation::atmId).containsExactly("A");
+            .extracting(AtmLocation::atmId).containsExactly("A", "N3");
     }
 
     @Test

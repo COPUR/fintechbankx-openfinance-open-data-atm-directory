@@ -24,8 +24,8 @@ class ListAtmsQueryTest {
     }
 
     @Test
-    void radiusDefaultsToTenKilometres() {
-        assertThat(new ListAtmsQuery(25.2, 55.2, null).effectiveRadiusKm()).isEqualTo(10.0);
+    void radiusDefaultsToFiveKilometresLikeTheMonolith() {
+        assertThat(new ListAtmsQuery(25.2, 55.2, null).effectiveRadiusKm()).isEqualTo(5.0);
         assertThat(new ListAtmsQuery(25.2, 55.2, 3.5).effectiveRadiusKm()).isEqualTo(3.5);
     }
 

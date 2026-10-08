@@ -101,7 +101,7 @@ components:
       name: radius
       in: query
       required: false
-      description: Search radius in km, greater than 0 and at most 50; defaults to 10. Ignored without `lat` and `long`.
+      description: Search radius in km, greater than 0 and at most 50; defaults to 5. Ignored without `lat` and `long`.
       schema:
         type: number
         format: double
