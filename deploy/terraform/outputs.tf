@@ -4,13 +4,13 @@ output "workload_role_arn" {
 }
 
 output "jdbc_url" {
-  description = "Writer endpoint: Helm value config.FLYWAY_URL and the import script's host."
-  value       = "jdbc:postgresql://${aws_rds_cluster.database.endpoint}:5432/${local.database}?sslmode=require"
+  description = "Writer endpoint: Helm value config.FLYWAY_URL and the import script's host. TLS with server-certificate and host-name verification against the RDS CA bundle the chart mounts from the platform ConfigMap rds-ca-bundle."
+  value       = "jdbc:postgresql://${aws_rds_cluster.database.endpoint}:5432/${local.database}?sslmode=verify-full&sslrootcert=/etc/fintechbankx/rds-ca/global-bundle.pem"
 }
 
 output "reader_jdbc_url" {
-  description = "Reader endpoint: Helm value config.DB_URL (the service only reads)."
-  value       = "jdbc:postgresql://${aws_rds_cluster.database.reader_endpoint}:5432/${local.database}?sslmode=require"
+  description = "Reader endpoint: Helm value config.DB_URL (the service only reads). TLS verified against the same mounted RDS CA bundle."
+  value       = "jdbc:postgresql://${aws_rds_cluster.database.reader_endpoint}:5432/${local.database}?sslmode=verify-full&sslrootcert=/etc/fintechbankx/rds-ca/global-bundle.pem"
 }
 
 output "app_db_secret_name" {

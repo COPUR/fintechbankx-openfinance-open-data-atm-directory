@@ -51,12 +51,24 @@ podDisruptionBudget:
 config:
   # The service only reads: DB_URL is the Aurora reader endpoint (terraform output reader_jdbc_url),
   # FLYWAY_URL the writer (output jdbc_url). Empty FLYWAY_URL means "migrate through DB_URL" (single instance).
+  # Both verify Aurora's certificate against databaseCaBundle; rendering fails otherwise:
+  # jdbc:postgresql://<endpoint>:5432/db_of_atm_directory_<env>?sslmode=verify-full&sslrootcert=/etc/fintechbankx/rds-ca/global-bundle.pem
   DB_URL: ""
   FLYWAY_URL: ""
   # Runtime role: SELECT on atm only (db/bootstrap/bootstrap-roles.sql, V3__grant_least_privilege.sql).
   DB_USERNAME: atm_directory_app
   DB_POOL_MAX: "5"
   ATM_DIRECTORY_SEED_ENABLED: "false"   # sample ATMs; dev only, never staging/prod
+
+# Amazon RDS CA bundle for PostgreSQL TLS (sslmode=verify-full). The platform's
+# trust-manager publishes ConfigMap rds-ca-bundle (key global-bundle.pem) into every
+# service namespace (platform contract, "Database CA bundle"); the chart mounts it
+# read-only into the migrate init container and the service container, and every
+# JDBC URL must point sslrootcert at <mountPath>/<key>.
+databaseCaBundle:
+  configMapName: rds-ca-bundle
+  key: global-bundle.pem
+  mountPath: /etc/fintechbankx/rds-ca
 
 # Flyway runs in the "migrate" init container as the schema owner.
 migration:

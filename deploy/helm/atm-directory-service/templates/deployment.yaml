@@ -35,7 +35,8 @@ spec:
         prometheus.io/port: {{ .Values.service.managementPort | quote }}
         prometheus.io/path: /actuator/prometheus
         # The migrate init container runs before the Istio sidecar exists; Aurora is outside
-        # the mesh and is reached with TLS (sslmode=require), so 5432 bypasses the proxy.
+        # the mesh and is reached with verified TLS (sslmode=verify-full against the mounted
+        # RDS CA bundle), so 5432 bypasses the proxy.
         traffic.sidecar.istio.io/excludeOutboundPorts: "5432"
     spec:
       serviceAccountName: {{ .Values.serviceAccount.name }}
@@ -91,6 +92,9 @@ spec:
           volumeMounts:
             - name: tmp
               mountPath: /tmp
+            - name: rds-ca-bundle
+              mountPath: {{ .Values.databaseCaBundle.mountPath }}
+              readOnly: true
       containers:
         - name: atm-directory-service
           image: "{{ required "image.repository is required" .Values.image.repository }}:{{ required "image.tag is required" .Values.image.tag }}"
@@ -140,6 +144,16 @@ spec:
           volumeMounts:
             - name: tmp
               mountPath: /tmp
+            - name: rds-ca-bundle
+              mountPath: {{ .Values.databaseCaBundle.mountPath }}
+              readOnly: true
       volumes:
         - name: tmp
           emptyDir: {}
+        # Platform trust-manager bundle; JDBC verifies Aurora's certificate with it.
+        - name: rds-ca-bundle
+          configMap:
+            name: {{ .Values.databaseCaBundle.configMapName }}
+            items:
+              - key: {{ .Values.databaseCaBundle.key }}
+                path: {{ .Values.databaseCaBundle.key }}

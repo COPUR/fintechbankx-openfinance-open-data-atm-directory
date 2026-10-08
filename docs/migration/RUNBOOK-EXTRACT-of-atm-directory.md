@@ -83,6 +83,7 @@ route back to the monolith.
 |---|---|
 | Platform mesh PR #11 (rate limit in commit `5e756f0`) | gateway route `/open-finance/v1/atms` to `atm-directory-service.open-finance.svc.cluster.local:8080` and the ingress rate limit (100-token bucket, a shared 50 req/s per gateway pod for all callers, `429` + `x-fbx-rate-limited: true`, no `Retry-After`), the only abuse control on this anonymous route |
 | Platform mesh NetworkPolicy for `open-finance` | the mesh repository owns NetworkPolicy (platform cicd-templates `1dd1138` turns chart policies off by default). The chart's own policy is opt-in: set `networkPolicy.enabled=true` and `networkPolicy.databaseCidrs` (Aurora subnets) only where the mesh repository does not cover the namespace; the policy then needs mesh sign-off |
+| ConfigMap `rds-ca-bundle` (key `global-bundle.pem`) in `open-finance` | published by the platform trust-manager (mesh commit `5e756f0`); the chart mounts it at `/etc/fintechbankx/rds-ca` in the migrate init container and the service container, and both JDBC URLs (Terraform outputs `jdbc_url`, `reader_jdbc_url`) use `sslmode=verify-full&sslrootcert=/etc/fintechbankx/rds-ca/global-bundle.pem`; without it the pods never start |
 | `ClusterSecretStore` `aws-secrets-manager` | External Secrets Operator syncs `db-app` (service) and `db-migration` (init container); without it the pods never start |
 | DBA bootstrap and Terraform (section 2) | roles, grants, secrets, Aurora |
 | A signed-off network file | first `--full` import (section 2) |
