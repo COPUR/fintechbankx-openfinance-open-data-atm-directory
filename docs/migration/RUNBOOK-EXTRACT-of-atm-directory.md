@@ -24,9 +24,25 @@ The monolith must not read `sc_of_atm_directory`; consumers use the HTTP API.
 
 ## 2. First load of the real network
 
+**Operator TLS.** Every operator `psql` connection below (DBA bootstrap, ATM
+import) verifies Aurora's certificate and host name with `sslmode=verify-full`
+against the Amazon RDS CA bundle: the same `global-bundle.pem` that the
+platform trust-manager publishes to the pods as ConfigMap `rds-ca-bundle`.
+On the host inside the VPC that runs these steps, download it once from the
+public AWS trust store:
+
+```sh
+mkdir -p "$HOME/rds-ca"
+curl -fsS -o "$HOME/rds-ca/global-bundle.pem" https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem
+```
+
+Refresh the file when AWS rotates its CAs (the platform refreshes the
+ConfigMap at the same time). A connection that fails certificate or host-name
+verification is a stop: do not fall back to `sslmode=require`.
+
 1. DBA bootstrap (once per environment, before the first deploy, with the
    RDS-managed admin secret, Terraform output `master_user_secret_arn`):
-   `psql "host=<writer> dbname=db_of_atm_directory_<env> user=atm_admin sslmode=require" -v ON_ERROR_STOP=1 -f db/bootstrap/bootstrap-roles.sql`.
+   `psql "host=<writer> dbname=db_of_atm_directory_<env> user=atm_admin sslmode=verify-full sslrootcert=$HOME/rds-ca/global-bundle.pem" -v ON_ERROR_STOP=1 -f db/bootstrap/bootstrap-roles.sql`.
    It creates three LOGIN roles without passwords and lets only the owner role
    create the schema. Set each password with `\password <role>` and store
    `{"username","password"}` in the matching Secrets Manager secret:
@@ -49,7 +65,7 @@ The monolith must not read `sc_of_atm_directory`; consumers use the HTTP API.
    `sc_of_atm_directory` and exits; the service container starts with Flyway off.
 3. Export the network from the ATM operations source as CSV with the header in
    `db/import/example-atms.csv`, then from a host inside the VPC:
-   `PGPASSWORD=... db/import/import-atms.sh "host=<writer> dbname=db_of_atm_directory_<env> user=atm_directory_import sslmode=require" atms.csv`
+   `PGPASSWORD=... db/import/import-atms.sh "host=<writer> dbname=db_of_atm_directory_<env> user=atm_directory_import sslmode=verify-full sslrootcert=$HOME/rds-ca/global-bundle.pem" atms.csv`
 4. Verify: the script prints rows in file / inserted / updated / unchanged; a
    second run must print `0 | 0 | <n>` unchanged. Each pod serves an in-process
    snapshot reloaded every 30 s (`ATM_DIRECTORY_SNAPSHOT_REFRESH`), so wait one

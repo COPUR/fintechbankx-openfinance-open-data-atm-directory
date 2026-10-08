@@ -26,7 +26,8 @@
 # Runs as the import role atm_directory_import (SELECT/INSERT/UPDATE on atm only;
 # secret <env>/atm-directory-service/db-import). Every inserted or updated row is
 # recorded in atm_history with the login role, application name and time.
-# Example conninfo: "host=<aurora-writer> dbname=db_of_atm_directory_dev user=atm_directory_import sslmode=require".
+# Example conninfo: "host=<aurora-writer> dbname=db_of_atm_directory_dev user=atm_directory_import sslmode=verify-full sslrootcert=$HOME/rds-ca/global-bundle.pem"
+# (the Amazon RDS CA bundle; see the runbook, section 2, "Operator TLS").
 # Passwords come from PGPASSWORD or ~/.pgpass, never from arguments.
 set -euo pipefail
 
