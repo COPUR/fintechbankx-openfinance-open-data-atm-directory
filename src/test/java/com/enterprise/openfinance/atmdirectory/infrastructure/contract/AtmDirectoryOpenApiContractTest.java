@@ -19,4 +19,12 @@ class AtmDirectoryOpenApiContractTest {
         assertThat(yaml).contains("X-FAPI-Interaction-ID");
         assertThat(yaml).contains("Cache-Control:", "Currency:", "'503':", "Retry-After:");
     }
+
+    @Test
+    void openApiDocumentsTheGatewayRateLimitOnTheAnonymousRoute() throws IOException {
+        String yaml = Files.readString(Path.of("api/openapi/atm-directory-service.yaml"));
+        String tooMany = yaml.substring(yaml.indexOf("'429':"), yaml.indexOf("'503':"));
+
+        assertThat(tooMany).contains("API gateway", "Retry-After:");
+    }
 }

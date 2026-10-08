@@ -56,6 +56,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: >-
+            Too many requests. Sent by the API gateway (mesh ingress rate limit on this
+            anonymous route), not by the service; retry after the given number of seconds.
+          headers:
+            Retry-After:
+              schema:
+                type: integer
         '503':
           description: Directory store temporarily unavailable; retry after the given number of seconds
           headers:

@@ -226,4 +226,16 @@ class AtmDirectoryControllerUnitTest {
             .andExpect(header().string("Cache-Control", "no-cache"))
             .andExpect(header().string("X-FAPI-Interaction-ID", "caller-b"));
     }
+    /** Anonymous endpoint: every query value is bounded before it reaches the store. */
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {
+        "lat=NaN&long=55.2", "lat=25.2&long=Infinity", "lat=-Infinity&long=55.2",
+        "lat=25.2&long=55.2&radius=NaN", "lat=25.2&long=55.2&radius=Infinity", "lat=25.2&long=55.2&radius=1e308",
+        "lat=1e400&long=55.2"})
+    void unboundedQueryValuesAreRejectedBeforeTheStoreIsCalled(String query) throws Exception {
+        mockMvc.perform(get("/open-finance/v1/atms?" + query).header("X-FAPI-Interaction-ID", "it-013"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+        org.mockito.Mockito.verifyNoInteractions(atmDirectoryUseCase);
+    }
 }

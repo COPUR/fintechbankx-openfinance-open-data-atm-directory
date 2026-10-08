@@ -10,7 +10,7 @@ Extraction of the ATM directory from `enterprise-loan-management-system` into
 | Slice | Public ATM directory: list and radius search (`GET /open-finance/v1/atms`) |
 | Owned data | `db_of_atm_directory_<env>`, schema `sc_of_atm_directory`: `atm` |
 | Events | none (outbox and `evt.of.atm.*` deferred, ADR-0001) |
-| Depends on | nothing at runtime besides its own PostgreSQL |
+| Depends on | its own PostgreSQL at runtime; the mesh ingress gateway rate limit on `/open-finance/v1/atms` (platform mesh PR #11), which is the only abuse control on this anonymous route: the service validates and bounds `lat`, `long` and `radius` but does not throttle, and the gateway answers `429` with `Retry-After` |
 
 ## 1. Data ownership split
 
