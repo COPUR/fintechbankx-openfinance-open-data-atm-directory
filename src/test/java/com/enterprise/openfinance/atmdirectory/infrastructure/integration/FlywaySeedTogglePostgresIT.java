@@ -11,6 +11,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import org.flywaydb.core.Flyway;
 import org.flywaydb.core.api.output.ValidateResult;
 import org.junit.jupiter.api.AfterEach;
@@ -22,6 +23,7 @@ import org.springframework.boot.autoconfigure.flyway.FlywayAutoConfiguration;
 import org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration;
 import org.springframework.boot.test.context.ConfigDataApplicationContextInitializer;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
+import org.springframework.boot.test.util.TestPropertyValues;
 
 /**
  * The seed toggle in a real environment: a dev database is migrated once with
@@ -47,13 +49,14 @@ class FlywaySeedTogglePostgresIT {
         .withInitializer(new ConfigDataApplicationContextInitializer())
         .withConfiguration(AutoConfigurations.of(DataSourceAutoConfiguration.class, FlywayAutoConfiguration.class))
         .withUserConfiguration(FlywaySeedConfiguration.class)
-        .withPropertyValues(
-            "spring.datasource.url=" + System.getenv("TEST_DB_URL"),
-            "spring.datasource.username=" + PostgresTestDatabase.username(),
-            "spring.datasource.password=" + PostgresTestDatabase.password(),
-            "spring.datasource.hikari.schema=" + SCHEMA,
-            "spring.flyway.schemas=" + SCHEMA,
-            "spring.flyway.default-schema=" + SCHEMA);
+        .withInitializer(context -> TestPropertyValues.of(Map.of(
+                "spring.datasource.url", System.getenv("TEST_DB_URL"),
+                "spring.datasource.username", PostgresTestDatabase.username(),
+                "spring.datasource.password", PostgresTestDatabase.password(),
+                "spring.datasource.hikari.schema", SCHEMA,
+                "spring.flyway.schemas", SCHEMA,
+                "spring.flyway.default-schema", SCHEMA))
+            .applyTo(context));
 
     @BeforeEach
     @AfterEach
