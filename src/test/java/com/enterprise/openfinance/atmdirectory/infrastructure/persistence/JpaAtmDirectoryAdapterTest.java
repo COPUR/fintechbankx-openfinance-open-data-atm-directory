@@ -7,7 +7,6 @@ import static org.mockito.Mockito.when;
 
 import com.enterprise.openfinance.atmdirectory.domain.exception.AtmDirectoryUnavailableException;
 import com.enterprise.openfinance.atmdirectory.domain.model.AtmLocation;
-import com.enterprise.openfinance.atmdirectory.domain.model.GeoBoundingBox;
 import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -31,22 +30,13 @@ class JpaAtmDirectoryAdapterTest {
     }
 
     @Test
-    void findWithinPassesTheBoxCornersInOrder() {
-        GeoBoundingBox box = new GeoBoundingBox(24.9, 25.4, 55.0, 55.5);
-        when(repository.findInBox(24.9, 25.4, 55.0, 55.5)).thenReturn(List.of(AtmPersistenceMapper.toEntity(DOWNTOWN, 2)));
-
-        assertThat(adapter.findWithin(box)).containsExactly(DOWNTOWN);
-    }
-
-    @Test
     void storeFailuresBecomeADomainUnavailableError() {
-        when(repository.findListedOrderByAtmId()).thenThrow(new DataAccessResourceFailureException("connection refused"));
-        when(repository.findInBox(0, 1, 0, 1)).thenThrow(new CannotCreateTransactionException("pool exhausted"));
+        when(repository.findListedOrderByAtmId()).thenThrow(new DataAccessResourceFailureException("connection refused"))
+            .thenThrow(new CannotCreateTransactionException("pool exhausted"));
 
         assertThatThrownBy(adapter::findAll).isInstanceOf(AtmDirectoryUnavailableException.class)
             .hasCauseInstanceOf(DataAccessResourceFailureException.class);
-        assertThatThrownBy(() -> adapter.findWithin(new GeoBoundingBox(0, 1, 0, 1)))
-            .isInstanceOf(AtmDirectoryUnavailableException.class)
+        assertThatThrownBy(adapter::findAll).isInstanceOf(AtmDirectoryUnavailableException.class)
             .hasCauseInstanceOf(CannotCreateTransactionException.class);
     }
 }

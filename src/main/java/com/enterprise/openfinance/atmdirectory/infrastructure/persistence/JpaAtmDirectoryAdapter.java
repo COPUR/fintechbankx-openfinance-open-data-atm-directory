@@ -2,7 +2,6 @@ package com.enterprise.openfinance.atmdirectory.infrastructure.persistence;
 
 import com.enterprise.openfinance.atmdirectory.domain.exception.AtmDirectoryUnavailableException;
 import com.enterprise.openfinance.atmdirectory.domain.model.AtmLocation;
-import com.enterprise.openfinance.atmdirectory.domain.model.GeoBoundingBox;
 import com.enterprise.openfinance.atmdirectory.domain.port.out.AtmDirectoryPort;
 import java.util.List;
 import java.util.function.Supplier;
@@ -23,12 +22,6 @@ public class JpaAtmDirectoryAdapter implements AtmDirectoryPort {
     @Override
     public List<AtmLocation> findAll() {
         return read(repository::findListedOrderByAtmId);
-    }
-
-    @Override
-    public List<AtmLocation> findWithin(GeoBoundingBox box) {
-        return read(() -> repository.findInBox(
-            box.minLatitude(), box.maxLatitude(), box.minLongitude(), box.maxLongitude()));
     }
 
     private static List<AtmLocation> read(Supplier<List<AtmJpaEntity>> query) {

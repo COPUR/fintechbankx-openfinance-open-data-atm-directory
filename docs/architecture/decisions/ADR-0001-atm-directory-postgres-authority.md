@@ -22,10 +22,18 @@ The service has no write use case today; the network is maintained outside it.
    (Flyway `V1__create_atm_table.sql`). `JpaAtmDirectoryAdapter` implements the
    existing `AtmDirectoryPort`; the JPA entity is separate from the domain record
    and read-only (`@Immutable`, read-only connection pool).
-2. **Radius search runs in the database.** The domain computes a
-   `GeoBoundingBox`; the adapter answers it from a GiST index on
-   `point(longitude, latitude)` and the use case keeps the exact great-circle
-   filter. Plain PostgreSQL, no PostGIS dependency.
+2. **Reads come from an in-process snapshot; radius search runs in memory.**
+   The use case loads every listed ATM through `AtmDirectoryPort.findAll()`,
+   keeps it with its content digest (the `ETag`), and reloads it every 30 s
+   (`ATM_DIRECTORY_SNAPSHOT_REFRESH`), so requests and `304` revalidations do
+   not touch PostgreSQL. A radius query is filtered from the snapshot by
+   `GeoBoundingBox`, then by exact great-circle distance. The directory is a
+   few thousand rows, so the copy is small; if it ever outgrows memory, the
+   GiST index `ix_atm_location` on `point(longitude, latitude)` (still in
+   `V1__create_atm_table.sql`) supports moving the box query back into the
+   database. Staleness: an import shows on every pod within about one refresh;
+   a failing refresh serves the last copy for at most 10 minutes
+   (`ATM_DIRECTORY_SNAPSHOT_MAX_AGE`), then the store outage surfaces as `503`.
 3. **No backfill.** There is no monolith data. Sample ATMs live in
    `classpath:db/seed` and load only when `ATM_DIRECTORY_SEED_ENABLED=true`
    (dev, CI). The real network is loaded with `db/import/import-atms.sh`, an

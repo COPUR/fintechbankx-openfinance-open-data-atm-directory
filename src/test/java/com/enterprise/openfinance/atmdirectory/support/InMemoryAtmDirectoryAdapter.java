@@ -1,7 +1,6 @@
 package com.enterprise.openfinance.atmdirectory.support;
 
 import com.enterprise.openfinance.atmdirectory.domain.model.AtmLocation;
-import com.enterprise.openfinance.atmdirectory.domain.model.GeoBoundingBox;
 import com.enterprise.openfinance.atmdirectory.domain.port.out.AtmDirectoryPort;
 import java.time.Instant;
 import java.util.Comparator;
@@ -34,10 +33,5 @@ public class InMemoryAtmDirectoryAdapter implements AtmDirectoryPort {
     @Override
     public List<AtmLocation> findAll() {
         return atms;
-    }
-
-    @Override
-    public List<AtmLocation> findWithin(GeoBoundingBox box) {
-        return atms.stream().filter(atm -> box.contains(atm.latitude(), atm.longitude())).toList();
     }
 }

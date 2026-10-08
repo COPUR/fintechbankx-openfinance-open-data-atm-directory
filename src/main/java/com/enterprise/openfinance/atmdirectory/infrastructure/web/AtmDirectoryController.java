@@ -1,13 +1,10 @@
 package com.enterprise.openfinance.atmdirectory.infrastructure.web;
 
+import com.enterprise.openfinance.atmdirectory.domain.model.AtmListResult;
 import com.enterprise.openfinance.atmdirectory.domain.model.AtmLocation;
 import com.enterprise.openfinance.atmdirectory.domain.port.in.AtmDirectoryUseCase;
 import com.enterprise.openfinance.atmdirectory.domain.query.ListAtmsQuery;
 import com.enterprise.openfinance.atmdirectory.infrastructure.web.dto.AtmListResponse;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.util.HexFormat;
 import java.util.List;
 import java.util.StringJoiner;
 import org.springframework.http.CacheControl;
@@ -47,8 +44,10 @@ public class AtmDirectoryController {
     ) {
         requireInteractionId(interactionId);
         requireSupportedAuthorizationScheme(authorization);
-        List<AtmLocation> atms = atmDirectoryUseCase.listAtms(new ListAtmsQuery(lat, lon, radius)).atms();
-        String etag = toEtag(atms);
+        // Served from the in-process snapshot: neither this path nor the 304 below reads PostgreSQL.
+        AtmListResult result = atmDirectoryUseCase.listAtms(new ListAtmsQuery(lat, lon, radius));
+        List<AtmLocation> atms = result.atms();
+        String etag = "\"" + result.contentDigest() + "\"";
 
         if (ifNoneMatch != null && ifNoneMatch.equals(etag)) {
             return ResponseEntity.status(HttpStatus.NOT_MODIFIED)
@@ -120,40 +119,5 @@ public class AtmDirectoryController {
             query.add("radius=" + radius);
         }
         return PATH + query;
-    }
-
-    /**
-     * Content ETag: SHA-256 over ";" + row for every ATM's canonical row, rows sorted, in one
-     * digest pass (linear in the network size; the value is the same as the first release's).
-     */
-    static String toEtag(List<AtmLocation> atms) {
-        MessageDigest digest;
-        try {
-            digest = MessageDigest.getInstance("SHA-256");
-        } catch (NoSuchAlgorithmException ex) {
-            throw new IllegalStateException("SHA-256 not available", ex);
-        }
-        byte[] separator = ";".getBytes(StandardCharsets.UTF_8);
-        atms.stream().map(AtmDirectoryController::canonicalRow).sorted().forEach(row -> {
-            digest.update(separator);
-            digest.update(row.getBytes(StandardCharsets.UTF_8));
-        });
-        return "\"" + HexFormat.of().formatHex(digest.digest()) + "\"";
-    }
-
-    private static String canonicalRow(AtmLocation a) {
-        return String.join("|",
-            a.atmId(),
-            a.name(),
-            a.status(),
-            String.valueOf(a.latitude()),
-            String.valueOf(a.longitude()),
-            a.address(),
-            a.city(),
-            a.country(),
-            a.accessibility(),
-            String.join(",", a.services()),
-            a.currency(),
-            a.updatedAt().toString());
     }
 }

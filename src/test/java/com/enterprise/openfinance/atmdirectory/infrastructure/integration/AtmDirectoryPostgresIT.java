@@ -8,8 +8,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.enterprise.openfinance.atmdirectory.application.AtmDirectoryService;
 import com.enterprise.openfinance.atmdirectory.domain.model.AtmLocation;
-import com.enterprise.openfinance.atmdirectory.domain.model.GeoBoundingBox;
 import com.enterprise.openfinance.atmdirectory.domain.port.out.AtmDirectoryPort;
 import com.enterprise.openfinance.atmdirectory.support.PostgresTestDatabase;
 import java.util.List;
@@ -18,12 +18,15 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
+import org.springframework.context.ApplicationContext;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.web.filter.ForwardedHeaderFilter;
 
 /**
  * Boots the whole service against PostgreSQL: Flyway builds sc_of_atm_directory
@@ -49,6 +52,45 @@ class AtmDirectoryPostgresIT {
     @Autowired MockMvc mvc;
     @Autowired JdbcTemplate jdbc;
     @Autowired AtmDirectoryPort directory;
+    @Autowired AtmDirectoryService service;
+    @Autowired ApplicationContext context;
+
+    @Test
+    void forwardedHeadersAreNotProcessed() {
+        // server.forward-headers-strategy=none: no ForwardedHeaderFilter in the chain.
+        assertThat(context.getBeansOfType(ForwardedHeaderFilter.class)).isEmpty();
+        assertThat(context.getBeansOfType(FilterRegistrationBean.class).values())
+            .noneMatch(registration -> registration.getFilter() instanceof ForwardedHeaderFilter);
+    }
+
+    @Test
+    void revalidationIsAnsweredFromTheSnapshotUntilItIsRefreshed() throws Exception {
+        service.refresh();
+        String etag = mvc.perform(get("/open-finance/v1/atms").header("X-FAPI-Interaction-ID", "it-snap-1"))
+            .andExpect(status().isOk()).andReturn().getResponse().getHeader("ETag");
+        JdbcTemplate writable = writableJdbc();
+        writable.update("""
+            insert into sc_of_atm_directory.atm (atm_id, name, status, latitude, longitude, address_line, city,
+              country_code, accessibility, services, currency)
+            values ('IT-SNAP-1', 'New ATM', 'InService', 25.1000, 55.2000, 'Road', 'Dubai', 'AE', 'Standard',
+                    ARRAY['CashWithdrawal'], 'AED')
+            """);
+        try {
+            mvc.perform(get("/open-finance/v1/atms").header("X-FAPI-Interaction-ID", "it-snap-2")
+                    .header("If-None-Match", etag))
+                .andExpect(status().isNotModified());
+
+            service.refresh();
+
+            mvc.perform(get("/open-finance/v1/atms").header("X-FAPI-Interaction-ID", "it-snap-3")
+                    .header("If-None-Match", etag))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.Meta.TotalRecords").value(4));
+        } finally {
+            writable.update("delete from sc_of_atm_directory.atm where atm_id = 'IT-SNAP-1'");
+            service.refresh();
+        }
+    }
 
     @Test
     void flywayCreatesOnlyTheTableThisServiceOwnsWithItsIndexes() {
@@ -76,14 +118,6 @@ class AtmDirectoryPostgresIT {
         assertThat(downtown.services()).containsExactly("CashWithdrawal", "CashDeposit");
         assertThat(downtown.currency()).isEqualTo("AED");
         assertThat(downtown.updatedAt()).hasToString("2026-03-01T00:00:00Z");
-    }
-
-    @Test
-    void boundingBoxQueryUsesInclusiveEdgesAndExcludesFarAtms() {
-        // Edges exactly on Marina (25.08, 55.14) and downtown (25.2048, 55.2708).
-        assertThat(directory.findWithin(new GeoBoundingBox(25.08, 25.2048, 55.14, 55.2708)))
-            .extracting(AtmLocation::atmId).containsExactly("SAMPLE-001", "SAMPLE-002");
-        assertThat(directory.findWithin(new GeoBoundingBox(-10, 10, -10, 10))).isEmpty();
     }
 
     @Test
@@ -134,7 +168,7 @@ class AtmDirectoryPostgresIT {
         assertThat(body).doesNotContain("evil.example");
     }
 
-    /** Port-level predicate test: a withdrawn ATM (full import) is never listed, inside the box or not. */
+    /** Port-level predicate test: a withdrawn ATM (full import) is never listed. */
     @Test
     void withdrawnAtmsAreNotListedByThePort() {
         JdbcTemplate writable = writableJdbc();
@@ -148,12 +182,10 @@ class AtmDirectoryPostgresIT {
         try {
             assertThat(directory.findAll()).extracting(AtmLocation::atmId).doesNotContain("IT-WD-1")
                 .contains("SAMPLE-001");
-            assertThat(directory.findWithin(new GeoBoundingBox(25.19, 25.21, 55.26, 55.28)))
-                .extracting(AtmLocation::atmId).containsExactly("SAMPLE-001");
 
             writable.update("update sc_of_atm_directory.atm set status = 'InService' where atm_id = 'IT-WD-1'");
-            assertThat(directory.findWithin(new GeoBoundingBox(25.19, 25.21, 55.26, 55.28)))
-                .extracting(AtmLocation::atmId).containsExactly("IT-WD-1", "SAMPLE-001");
+            assertThat(directory.findAll()).extracting(AtmLocation::atmId)
+                .containsExactly("IT-WD-1", "SAMPLE-001", "SAMPLE-002", "SAMPLE-003");
         } finally {
             writable.update("delete from sc_of_atm_directory.atm where atm_id = 'IT-WD-1'");
         }

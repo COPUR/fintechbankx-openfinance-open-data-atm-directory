@@ -1,7 +1,6 @@
 package com.enterprise.openfinance.atmdirectory.domain.port.out;
 
 import com.enterprise.openfinance.atmdirectory.domain.model.AtmLocation;
-import com.enterprise.openfinance.atmdirectory.domain.model.GeoBoundingBox;
 import java.util.List;
 
 /**
@@ -12,8 +11,6 @@ import java.util.List;
  */
 public interface AtmDirectoryPort {
 
+    /** Every listed ATM; the application keeps it as an in-process snapshot. */
     List<AtmLocation> findAll();
-
-    /** ATMs whose coordinates fall inside the box (edges inclusive). */
-    List<AtmLocation> findWithin(GeoBoundingBox box);
 }

@@ -163,7 +163,7 @@ resource "aws_secretsmanager_secret" "migration_database" {
   recovery_window_in_days = 7
 }
 
-# Import role atm_directory_import: SELECT/INSERT/UPDATE on atm, for db/import/import-atms.sh.
+# Import role atm_directory_import: SELECT/INSERT/UPDATE on atm (no DELETE), for db/import/import-atms.sh.
 # Read by the operator who runs the import, never synced into the cluster.
 resource "aws_secretsmanager_secret" "import_database" {
   name                    = "${var.environment}/${local.service_slug}/db-import"

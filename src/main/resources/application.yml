@@ -52,7 +52,9 @@ spring:
 server:
   port: 8080
   shutdown: graceful
-  forward-headers-strategy: framework
+  # X-Forwarded-* are not trusted: nothing in a response is built from the request
+  # URL, and the mesh, not the pod, terminates TLS.
+  forward-headers-strategy: none
 
 management:
   server:
@@ -81,6 +83,13 @@ management:
       service: svc-of-atm-directory
 
 atm-directory:
+  snapshot:
+    # Reads and ETag revalidations are served from an in-process snapshot, reloaded on
+    # this interval; an import is visible on every pod within about one interval.
+    refresh-interval: ${ATM_DIRECTORY_SNAPSHOT_REFRESH:PT30S}
+    # If refreshing keeps failing, the last snapshot is served for at most this long;
+    # after that requests reload it themselves and a store outage returns 503.
+    max-age: ${ATM_DIRECTORY_SNAPSHOT_MAX_AGE:PT10M}
   seed:
     # Loads the sample ATMs in classpath:db/seed. Dev and CI only; never in staging/prod.
     enabled: ${ATM_DIRECTORY_SEED_ENABLED:false}

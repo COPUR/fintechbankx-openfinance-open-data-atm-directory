@@ -5,7 +5,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.enterprise.openfinance.atmdirectory.application.AtmDirectoryService;
+import com.enterprise.openfinance.atmdirectory.infrastructure.config.AtmDirectoryConfiguration;
 import com.enterprise.openfinance.atmdirectory.infrastructure.web.AtmDirectoryController;
 import com.enterprise.openfinance.atmdirectory.support.InMemoryAtmDirectoryAdapter;
 import org.junit.jupiter.api.Test;
@@ -16,7 +16,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 /** Web layer and use case together over the sample directory, no database. */
 @WebMvcTest(controllers = AtmDirectoryController.class)
-@Import({AtmDirectoryService.class, InMemoryAtmDirectoryAdapter.class})
+@Import({AtmDirectoryConfiguration.class, InMemoryAtmDirectoryAdapter.class})
 class AtmDirectoryUatTest {
 
     @Autowired

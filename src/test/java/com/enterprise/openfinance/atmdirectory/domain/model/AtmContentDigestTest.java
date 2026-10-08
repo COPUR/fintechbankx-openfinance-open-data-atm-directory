@@ -1,8 +1,7 @@
-package com.enterprise.openfinance.atmdirectory.infrastructure.web;
+package com.enterprise.openfinance.atmdirectory.domain.model;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.enterprise.openfinance.atmdirectory.domain.model.AtmLocation;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -10,7 +9,7 @@ import java.util.List;
 import java.util.stream.IntStream;
 import org.junit.jupiter.api.Test;
 
-class AtmEtagTest {
+class AtmContentDigestTest {
 
     private static List<AtmLocation> network(int size) {
         return IntStream.range(0, size)
@@ -21,28 +20,38 @@ class AtmEtagTest {
     }
 
     @Test
-    void etagIsUnchangedFromTheFirstReleaseSoCachedCopiesStayValid() {
+    void digestIsUnchangedFromTheFirstReleaseEtagSoCachedCopiesStayValid() {
         // Value produced by the original (string-concatenating) implementation for this input.
-        assertThat(AtmDirectoryController.toEtag(network(3)))
-            .isEqualTo("\"9cbd3376763af290b35c51a54f0d564c29f0196e46cd8607d820bfc7f9c3fac3\"");
+        assertThat(AtmContentDigest.of(network(3)))
+            .isEqualTo("9cbd3376763af290b35c51a54f0d564c29f0196e46cd8607d820bfc7f9c3fac3");
     }
 
     @Test
-    void etagDoesNotDependOnTheOrderTheStoreReturned() {
+    void digestChangesWhenAnAtmChanges() {
+        AtmLocation downtown = network(1).getFirst();
+        AtmLocation outOfService = new AtmLocation(downtown.atmId(), downtown.name(), "OutOfService",
+            downtown.latitude(), downtown.longitude(), downtown.address(), downtown.city(), downtown.country(),
+            downtown.accessibility(), downtown.services(), downtown.currency(), downtown.updatedAt());
+
+        assertThat(AtmContentDigest.of(List.of(downtown))).isNotEqualTo(AtmContentDigest.of(List.of(outOfService)));
+    }
+
+    @Test
+    void digestDoesNotDependOnTheOrderTheStoreReturned() {
         List<AtmLocation> reversed = new ArrayList<>(network(50));
         java.util.Collections.reverse(reversed);
 
-        assertThat(AtmDirectoryController.toEtag(reversed)).isEqualTo(AtmDirectoryController.toEtag(network(50)));
+        assertThat(AtmContentDigest.of(reversed)).isEqualTo(AtmContentDigest.of(network(50)));
     }
 
     @Test
-    void etagOfALargeNetworkIsLinear() {
+    void digestOfALargeNetworkIsLinear() {
         List<AtmLocation> sixThousand = network(6_000);
         List<AtmLocation> sixtyThousand = network(60_000);
-        AtmDirectoryController.toEtag(sixThousand); // warm-up
+        AtmContentDigest.of(sixThousand); // warm-up
 
         long start = System.nanoTime();
-        AtmDirectoryController.toEtag(sixtyThousand);
+        AtmContentDigest.of(sixtyThousand);
         Duration elapsed = Duration.ofNanos(System.nanoTime() - start);
 
         // The quadratic version needed about 1.7 s for 6,000 rows, so 60,000 would take minutes.

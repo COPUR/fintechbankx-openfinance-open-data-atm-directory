@@ -17,32 +17,20 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Import;
-import org.springframework.web.filter.ForwardedHeaderFilter;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.test.web.servlet.MockMvc;
 
 /**
- * Web slice with the forwarded-header handling production uses
- * (server.forward-headers-strategy=framework registers a ForwardedHeaderFilter).
+ * Web slice. Production sets server.forward-headers-strategy=none; the forged-host
+ * tests below also hold with a ForwardedHeaderFilter, because no part of the response
+ * is built from the request URL.
  */
 @WebMvcTest(controllers = AtmDirectoryController.class)
-@Import(AtmDirectoryControllerUnitTest.ForwardedHeaders.class)
 class AtmDirectoryControllerUnitTest {
 
     private static final AtmLocation DOWNTOWN = new AtmLocation("ATM-001", "Downtown", "InService", 25.2, 55.2,
         "Road 1", "Dubai", "AE", "Wheelchair", List.of("CashWithdrawal"), "AED", Instant.parse("2026-03-01T00:00:00Z"));
-
-    @TestConfiguration
-    static class ForwardedHeaders {
-        @Bean
-        ForwardedHeaderFilter forwardedHeaderFilter() {
-            return new ForwardedHeaderFilter();
-        }
-    }
 
     @Autowired
     private MockMvc mockMvc;
@@ -65,6 +53,20 @@ class AtmDirectoryControllerUnitTest {
     }
 
     @Test
+    void etagIsTheSnapshotDigestAndRevalidationNeedsNoRecomputation() throws Exception {
+        when(atmDirectoryUseCase.listAtms(any())).thenReturn(new AtmListResult(List.of(DOWNTOWN), "d1g3st"));
+
+        mockMvc.perform(get("/open-finance/v1/atms").header("X-FAPI-Interaction-ID", "it-010"))
+            .andExpect(status().isOk())
+            .andExpect(header().string("ETag", "\"d1g3st\""));
+        mockMvc.perform(get("/open-finance/v1/atms")
+                .header("X-FAPI-Interaction-ID", "it-011")
+                .header("If-None-Match", "\"d1g3st\""))
+            .andExpect(status().isNotModified())
+            .andExpect(header().string("X-FAPI-Interaction-ID", "it-011"));
+    }
+
+    @Test
     void shouldReturnNotModifiedWhenIfNoneMatchMatches() throws Exception {
         when(atmDirectoryUseCase.listAtms(any())).thenReturn(new AtmListResult(List.of(DOWNTOWN)));
 
@@ -78,16 +80,6 @@ class AtmDirectoryControllerUnitTest {
             .andExpect(header().string("ETag", etag))
             .andExpect(header().string("Cache-Control", "no-cache"))
             .andExpect(header().string("X-OF-Cache", "HIT"));
-    }
-
-    @Test
-    void etagChangesWhenAnAtmChanges() {
-        AtmLocation moved = new AtmLocation("ATM-001", "Downtown", "OutOfService", 25.2, 55.2,
-            "Road 1", "Dubai", "AE", "Wheelchair", List.of("CashWithdrawal"), "AED", Instant.parse("2026-03-04T00:00:00Z"));
-
-        assertThat(AtmDirectoryController.toEtag(List.of(DOWNTOWN)))
-            .isNotEqualTo(AtmDirectoryController.toEtag(List.of(moved)))
-            .startsWith("\"").endsWith("\"");
     }
 
     @Test

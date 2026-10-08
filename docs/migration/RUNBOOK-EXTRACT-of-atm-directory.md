@@ -10,7 +10,7 @@ Extraction of the ATM directory from `enterprise-loan-management-system` into
 | Slice | Public ATM directory: list and radius search (`GET /open-finance/v1/atms`) |
 | Owned data | `db_of_atm_directory_<env>`, schema `sc_of_atm_directory`: `atm` |
 | Events | none (outbox and `evt.of.atm.*` deferred, ADR-0001) |
-| Depends on | its own PostgreSQL at runtime; the mesh ingress gateway rate limit on `/open-finance/v1/atms` (platform mesh PR #11), which is the only abuse control on this anonymous route: the service validates and bounds `lat`, `long` and `radius` but does not throttle, and the gateway answers `429` with `Retry-After` |
+| Depends on | its own PostgreSQL at runtime; the mesh ingress gateway rate limit on `/open-finance/v1/atms` (platform mesh PR #11, commit `5e756f0`), which is the only abuse control on this anonymous route: the service validates and bounds `lat`, `long` and `radius` but does not throttle, and the gateway answers `429` with `Retry-After` |
 
 ## 1. Data ownership split
 
@@ -35,7 +35,7 @@ The monolith must not read `sc_of_atm_directory`; consumers use the HTTP API.
    |---|---|---|---|
    | `atm_directory_migrate` | `<env>/atm-directory-service/db-migration` (`migration_db_secret_name`) | Flyway in the `migrate` init container | owns `sc_of_atm_directory` |
    | `atm_directory_app` | `<env>/atm-directory-service/db-app` (`app_db_secret_name`) | service container | `USAGE` on the schema, `SELECT` on `atm` |
-   | `atm_directory_import` | `<env>/atm-directory-service/db-import` (`import_db_secret_name`) | operator running the import | `USAGE`, `SELECT`/`INSERT`/`UPDATE` on `atm`, `TEMPORARY` |
+   | `atm_directory_import` | `<env>/atm-directory-service/db-import` (`import_db_secret_name`) | operator running the import | `USAGE`, `SELECT`/`INSERT`/`UPDATE` on `atm` (no `DELETE`), `TEMPORARY` |
 
    Flyway grants the table privileges (`V3__grant_least_privilege.sql`). If a
    role was created after the first deploy, re-run that file with psql as
@@ -51,8 +51,11 @@ The monolith must not read `sc_of_atm_directory`; consumers use the HTTP API.
    `db/import/example-atms.csv`, then from a host inside the VPC:
    `PGPASSWORD=... db/import/import-atms.sh "host=<writer> dbname=db_of_atm_directory_<env> user=atm_directory_import sslmode=require" atms.csv`
 4. Verify: the script prints rows in file / inserted / updated / unchanged; a
-   second run must print `0 | 0 | <n>` unchanged. `GET /open-finance/v1/atms`
-   returns the imported count in `Meta.TotalRecords`.
+   second run must print `0 | 0 | <n>` unchanged. Each pod serves an in-process
+   snapshot reloaded every 30 s (`ATM_DIRECTORY_SNAPSHOT_REFRESH`), so wait one
+   interval, then `GET /open-finance/v1/atms` returns the imported count in
+   `Meta.TotalRecords`. `atm.directory.snapshot.age` above 120 s on any pod means
+   its refresh is failing (it serves the old copy for up to 10 minutes, then `503`).
 
 Re-imports are safe at any time: changed rows get `version + 1` and a new
 `updated_at`, identical rows are untouched, an invalid row aborts the whole
@@ -78,7 +81,7 @@ route back to the monolith.
 
 | Dependency | Why |
 |---|---|
-| Platform mesh PR #11 | gateway route `/open-finance/v1/atms` to `atm-directory-service.open-finance.svc.cluster.local:8080` and the ingress rate limit (100-token bucket, 50/s per gateway pod, `429` + `Retry-After` + `x-fbx-rate-limited: true`), the only abuse control on this anonymous route |
+| Platform mesh PR #11 (rate limit in commit `5e756f0`) | gateway route `/open-finance/v1/atms` to `atm-directory-service.open-finance.svc.cluster.local:8080` and the ingress rate limit (100-token bucket, 50/s per gateway pod, `429` + `Retry-After` + `x-fbx-rate-limited: true`), the only abuse control on this anonymous route |
 | `ClusterSecretStore` `aws-secrets-manager` | External Secrets Operator syncs `db-app` (service) and `db-migration` (init container); without it the pods never start |
 | DBA bootstrap and Terraform (section 2) | roles, grants, secrets, Aurora |
 | A signed-off network file | first `--full` import (section 2) |
