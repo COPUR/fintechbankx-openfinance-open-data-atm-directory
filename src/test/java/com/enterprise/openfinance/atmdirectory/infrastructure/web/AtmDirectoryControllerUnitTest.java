@@ -88,6 +88,44 @@ class AtmDirectoryControllerUnitTest {
     }
 
     @Test
+    void latitudeWithoutLongitudeIsABadRequest() throws Exception {
+        mockMvc.perform(get("/open-finance/v1/atms?lat=25.2").header("X-FAPI-Interaction-ID", "it-007"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value("latitude and longitude must be provided together"));
+    }
+
+    @Test
+    void radiusAboveFiftyKilometresIsABadRequest() throws Exception {
+        mockMvc.perform(get("/open-finance/v1/atms?lat=25.2&long=55.2&radius=51").header("X-FAPI-Interaction-ID", "it-008"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+    }
+
+    @Test
+    void blankInteractionIdIsABadRequest() throws Exception {
+        mockMvc.perform(get("/open-finance/v1/atms").header("X-FAPI-Interaction-ID", "  "))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("INVALID_REQUEST"))
+            .andExpect(jsonPath("$.interactionId").value("UNKNOWN"));
+    }
+
+    @Test
+    void authorizationHeaderIsOptionalButMustBeBearerOrDpop() throws Exception {
+        when(atmDirectoryUseCase.listAtms(any())).thenReturn(new AtmListResult(List.of(DOWNTOWN)));
+
+        mockMvc.perform(get("/open-finance/v1/atms").header("X-FAPI-Interaction-ID", "it-009")
+                .header("Authorization", "Bearer abc"))
+            .andExpect(status().isOk());
+        mockMvc.perform(get("/open-finance/v1/atms").header("X-FAPI-Interaction-ID", "it-009")
+                .header("Authorization", "DPoP abc"))
+            .andExpect(status().isOk());
+        mockMvc.perform(get("/open-finance/v1/atms").header("X-FAPI-Interaction-ID", "it-009")
+                .header("Authorization", "Basic dXNlcjpwYXNz"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value("Authorization header must use Bearer or DPoP token type"));
+    }
+
+    @Test
     void nonNumericCoordinateIsABadRequest() throws Exception {
         mockMvc.perform(get("/open-finance/v1/atms?lat=north").header("X-FAPI-Interaction-ID", "it-003"))
             .andExpect(status().isBadRequest())

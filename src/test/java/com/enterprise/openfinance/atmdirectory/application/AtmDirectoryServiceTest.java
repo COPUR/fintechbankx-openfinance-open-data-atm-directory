@@ -80,13 +80,6 @@ class AtmDirectoryServiceTest {
     }
 
     @Test
-    void latitudeWithoutLongitudeIsNotAGeoQuery() {
-        when(atmDirectoryPort.findAll()).thenReturn(List.of(DOWNTOWN, ABU_DHABI));
-
-        assertThat(service.listAtms(new ListAtmsQuery(25.2048, null, 5.0)).atms()).hasSize(2);
-    }
-
-    @Test
     void greatCircleDistanceMatchesKnownFigures() {
         assertThat(AtmDirectoryService.distanceKm(25.2048, 55.2708, 25.0800, 55.1400)).isCloseTo(19.129, within(0.001));
         assertThat(AtmDirectoryService.distanceKm(25.2048, 55.2708, 24.4950, 54.3820)).isCloseTo(119.464, within(0.001));

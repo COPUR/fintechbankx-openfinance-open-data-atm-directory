@@ -2,24 +2,31 @@ package com.enterprise.openfinance.atmdirectory.domain.query;
 
 import com.enterprise.openfinance.atmdirectory.domain.model.Coordinates;
 
+/**
+ * ATM directory query. Either no location (whole directory) or both coordinates
+ * with an optional radius in (0, 50] km; a radius without coordinates is ignored.
+ */
 public record ListAtmsQuery(Double latitude, Double longitude, Double radiusKm) {
 
     public static final double DEFAULT_RADIUS_KM = 10.0d;
+    public static final double MAX_RADIUS_KM = 50.0d;
 
     public ListAtmsQuery {
-        if (radiusKm != null && !(radiusKm >= 0)) {
-            throw new IllegalArgumentException("radiusKm must be >= 0");
+        if ((latitude == null) != (longitude == null)) {
+            throw new IllegalArgumentException("latitude and longitude must be provided together");
         }
-        if (latitude != null) {
-            Coordinates.requireLatitude(latitude);
-        }
-        if (longitude != null) {
-            Coordinates.requireLongitude(longitude);
+        if (latitude == null) {
+            radiusKm = null;
+        } else {
+            Coordinates.requireValid(latitude, longitude);
+            if (radiusKm != null && !(radiusKm > 0 && radiusKm <= MAX_RADIUS_KM)) {
+                throw new IllegalArgumentException("radiusKm must be greater than 0 and at most 50");
+            }
         }
     }
 
     public boolean hasGeoFilter() {
-        return latitude != null && longitude != null;
+        return latitude != null;
     }
 
     public double effectiveRadiusKm() {

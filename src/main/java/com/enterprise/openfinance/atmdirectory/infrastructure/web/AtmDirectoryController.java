@@ -39,11 +39,14 @@ public class AtmDirectoryController {
     public ResponseEntity<AtmListResponse> listAtms(
         @RequestHeader("X-FAPI-Interaction-ID") String interactionId,
         @RequestHeader(value = "If-None-Match", required = false) String ifNoneMatch,
+        @RequestHeader(value = "Authorization", required = false) String authorization,
         @RequestParam(value = "lat", required = false) Double lat,
         @RequestParam(value = "long", required = false) Double lon,
         @RequestParam(value = "radius", required = false) Double radius,
         HttpServletRequest request
     ) {
+        requireInteractionId(interactionId);
+        requireSupportedAuthorizationScheme(authorization);
         List<AtmLocation> atms = atmDirectoryUseCase.listAtms(new ListAtmsQuery(lat, lon, radius)).atms();
         String etag = toEtag(atms);
 
@@ -68,6 +71,20 @@ public class AtmDirectoryController {
             .eTag(etag)
             .cacheControl(cacheControl)
             .body(response);
+    }
+
+    private static void requireInteractionId(String interactionId) {
+        if (interactionId.isBlank()) {
+            throw new IllegalArgumentException("X-FAPI-Interaction-ID must not be blank");
+        }
+    }
+
+    /** Public endpoint: no token is needed, but a token that is sent must be Bearer or DPoP (monolith parity). */
+    private static void requireSupportedAuthorizationScheme(String authorization) {
+        if (authorization != null && !authorization.isBlank()
+            && !authorization.startsWith("Bearer ") && !authorization.startsWith("DPoP ")) {
+            throw new IllegalArgumentException("Authorization header must use Bearer or DPoP token type");
+        }
     }
 
     private AtmListResponse.AtmItem toItem(AtmLocation atm) {

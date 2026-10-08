@@ -78,12 +78,14 @@ components:
       name: Authorization
       in: header
       required: false
+      description: Not needed (public data). When sent, it must use the Bearer or DPoP scheme.
       schema:
         type: string
     Latitude:
       name: lat
       in: query
       required: false
+      description: Latitude of the search centre. Must be sent together with `long`.
       schema:
         type: number
         format: double
@@ -91,6 +93,7 @@ components:
       name: long
       in: query
       required: false
+      description: Longitude of the search centre. Must be sent together with `lat`.
       schema:
         type: number
         format: double
@@ -98,9 +101,13 @@ components:
       name: radius
       in: query
       required: false
+      description: Search radius in km, greater than 0 and at most 50; defaults to 10. Ignored without `lat` and `long`.
       schema:
         type: number
         format: double
+        exclusiveMinimum: true
+        minimum: 0
+        maximum: 50
     IfNoneMatch:
       name: If-None-Match
       in: header
