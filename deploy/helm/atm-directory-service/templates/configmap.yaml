@@ -1,0 +1,14 @@
+{{- $_ := required "config.DB_URL is required (terraform output reader_jdbc_url)" .Values.config.DB_URL }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "atm.name" . }}
+  labels:
+    {{- include "atm.labels" . | nindent 4 }}
+data:
+  {{- range $key, $value := .Values.config }}
+  {{- /* Empty values are left out so application.yml defaults apply (e.g. FLYWAY_URL falls back to DB_URL). */}}
+  {{- if $value }}
+  {{ $key }}: {{ $value | quote }}
+  {{- end }}
+  {{- end }}
