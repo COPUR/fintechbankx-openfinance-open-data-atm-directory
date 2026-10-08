@@ -46,7 +46,7 @@ The service has no write use case today; the network is maintained outside it.
    also built `Links.Self` from the request URL, so a forged `X-Forwarded-Host`
    could poison a cached body. `Links.Self` is relative again, built from the
    validated query as in the monolith. The platform module is called with `cache_engine = "none"`.
-6. **Security posture unchanged.** The endpoint stays public and
+6. **Authentication unchanged.** The endpoint stays public and
    unauthenticated (`security: []` in the OpenAPI spec, exempt in the FAPI/DPoP
    guard), still requires `X-FAPI-Interaction-ID`, and is reachable only through
    the ingress gateway (NetworkPolicy, mesh mTLS). No OAuth2 resource server is

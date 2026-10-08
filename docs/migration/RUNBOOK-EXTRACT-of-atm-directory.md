@@ -67,14 +67,71 @@ Every inserted or updated row is recorded in `sc_of_atm_directory.atm_history`
 (old and new row, login role, `application_name`, time); the table is
 append-only and readable only by the schema owner.
 
-## 3. Cutover plan
+## 3. Go-live (one way)
 
-| Step | Action | Rollback |
+The monolith's `AtmDataController` (`open-finance-context`) served three
+in-memory sample ATMs; it never held the real network. There is nothing to
+fall back to, so go-live is one way: no shadow traffic, no weighted split, no
+route back to the monolith.
+
+### Dependencies (all must be in place before step 2)
+
+| Dependency | Why |
+|---|---|
+| Platform mesh PR #11 | gateway route `/open-finance/v1/atms` to `atm-directory-service.open-finance.svc.cluster.local:8080` and the ingress rate limit (100-token bucket, 50/s per gateway pod, `429` + `Retry-After` + `x-fbx-rate-limited: true`), the only abuse control on this anonymous route |
+| `ClusterSecretStore` `aws-secrets-manager` | External Secrets Operator syncs `db-app` (service) and `db-migration` (init container); without it the pods never start |
+| DBA bootstrap and Terraform (section 2) | roles, grants, secrets, Aurora |
+| A signed-off network file | first `--full` import (section 2) |
+
+### Steps
+
+| Step | Action | Check before going on |
 |---|---|---|
-| 1 | Deploy with an empty table, import the network (section 2) | drop `sc_of_atm_directory`; nothing else changed |
-| 2 | Gateway routes `/open-finance/v1/atms` to `atm-directory-service.open-finance.svc.cluster.local:8080` | route back; the monolith never served real ATM data, so the fallback is "endpoint unavailable" |
-| 3 | Schedule the import (daily or on network change) from the ATM operations source | stop the schedule; data stays as last imported |
-| 4 | Remove `services/openfinance-atm-directory-service` from the monolith | restore from git |
+| 1 | Deploy the chart, run the first import with `--full`, compare `Meta.TotalRecords` with the file's row count | parity check below passes against the service directly (port-forward) |
+| 2 | Merge and apply mesh PR #11: the gateway route switches to the service in one step, together with the rate limit | the parity check passes through the gateway; rollback triggers stay clear for 30 minutes |
+| 3 | Schedule the import (daily or on network change, `--full` when the operations source signs off the whole network) | each run prints its counts; `atm_history` shows the import role |
+| 4 | Remove `services/openfinance-atm-directory-service` and the `atmdata` slice from the monolith after one release without rollback | no traffic on the old route |
+
+### Parity check: response shape and headers only
+
+The data differs on purpose (real network instead of three samples), so the
+check compares structure, not values: status `200`; JSON with `Data.ATM[]`
+items carrying `AtmId`, `Name`, `Status`, `Latitude`, `Longitude`, `Address`,
+`City`, `Country`, `Accessibility`, `Services`, `Currency`, `UpdatedAt`;
+`Links.Self` relative; `Meta.TotalRecords` equal to the item count; headers
+`X-FAPI-Interaction-ID` (echoed), `ETag`, `Cache-Control`, `X-OF-Cache`; a
+repeated request with `If-None-Match` gives `304`; missing interaction id or
+`lat` without `long` gives `400`.
+
+Responses are **not** identical to the monolith's:
+
+| Aspect | Monolith | This service |
+|---|---|---|
+| Data | three hard-coded samples | the imported network; `Withdrawn` ATMs are not listed |
+| `Cache-Control` | `max-age=60, public` | `no-cache` (revalidate with the `ETag`) |
+| `ETag` value | hash over the response including `Links.Self` | hash over the ATM rows only (values differ, so clients revalidate once) |
+| `X-OF-Cache` | `HIT`/`MISS` from an in-process cache on `200` | `MISS` on `200`, `HIT` on `304` |
+| `429` | none | from the gateway (mesh PR #11) |
+| `503` + `Retry-After: 5` | none | when the database is unavailable |
+
+### Rollback triggers (any one, measured at the gateway)
+
+| Trigger | Threshold |
+|---|---|
+| 5xx rate on `/open-finance/v1/atms` | above 1 % of requests for 5 minutes |
+| p99 latency | above 500 ms for 10 minutes |
+| Ready pods | below 2 for 5 minutes |
+| Directory content | `Meta.TotalRecords` differs from the signed-off file (minus withdrawn rows) after an import |
+| `429` share | above 5 % of requests for 15 minutes (rate limit too tight: fix in the mesh, do not roll back the service) |
+
+### Rollback
+
+There is no route back to the monolith. Roll back to the previous good state:
+
+- **Bad release:** `helm rollback atm-directory-service <previous revision> -n open-finance`.
+  Migrations are additive, so the previous image runs on the current schema.
+- **Bad data:** re-import the previous signed-off file with `--full`
+  (`atm_history` shows what the bad import changed).
 
 ## 4. Acceptance checklist
 
@@ -84,5 +141,5 @@ append-only and readable only by the schema owner.
 - [x] Import is idempotent and atomic, rehearsed in CI (`deploy/data-migration-rehearsal`, `scripts/migration/verify-migration.sh`)
 - [x] Container image, Helm chart, Terraform in CI (`Deployability` workflow)
 - [ ] Real network CSV source and import schedule agreed with ATM operations
-- [ ] Gateway route switched in the platform mesh repository
+- [ ] Gateway route and rate limit switched in one step (platform mesh PR #11)
 - [ ] Monolith launcher shell removed
