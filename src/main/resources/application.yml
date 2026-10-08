@@ -39,6 +39,9 @@ spring:
     default-schema: sc_of_atm_directory
     create-schemas: true
     locations: classpath:db/migration
+    # The optional db/seed location (repeatable R__ seed) may be switched off after it
+    # was applied once; "*:missing" tolerates that instead of failing validation.
+    ignore-migration-patterns: "*:future,*:missing"
     # Flyway writes, so it uses its own connection rather than the read-only pool.
     url: ${FLYWAY_URL:${spring.datasource.url}}
     user: ${FLYWAY_USER:${spring.datasource.username}}
