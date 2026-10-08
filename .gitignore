@@ -12,3 +12,7 @@ build/
 **/.terraform.lock.hcl
 *.tfstate
 *.tfstate.*
+
+# Outputs of the deployability workflow's helm render steps
+/rendered.yaml
+/tls.err
