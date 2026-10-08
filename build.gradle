@@ -58,9 +58,10 @@ jar {
 
 test {
     useJUnitPlatform()
-    // Integration tests read TEST_DB_URL / TEST_DB_USERNAME / TEST_DB_PASSWORD and are
-    // skipped (not failed) when no database is configured.
+    // Integration tests read TEST_DB_URL / TEST_DB_USERNAME / TEST_DB_PASSWORD. Without a
+    // database they are skipped locally but fail in CI (CI=true or JENKINS_URL set).
     inputs.property('testDbConfigured', System.getenv('TEST_DB_URL') != null)
+    inputs.property('ciRun', System.getenv('CI') != null || System.getenv('JENKINS_URL') != null)
     // No endpoint needs a token: the boot test proves the service starts with no OIDC_* setting.
     environment = environment.findAll { name, value -> !name.startsWith('OIDC_') }
 }
