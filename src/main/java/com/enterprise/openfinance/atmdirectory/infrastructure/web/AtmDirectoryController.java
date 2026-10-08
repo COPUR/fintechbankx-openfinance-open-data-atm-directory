@@ -122,30 +122,38 @@ public class AtmDirectoryController {
         return PATH + query;
     }
 
+    /**
+     * Content ETag: SHA-256 over ";" + row for every ATM's canonical row, rows sorted, in one
+     * digest pass (linear in the network size; the value is the same as the first release's).
+     */
     static String toEtag(List<AtmLocation> atms) {
-        String canonical = atms.stream()
-            .map(a -> String.join("|",
-                a.atmId(),
-                a.name(),
-                a.status(),
-                String.valueOf(a.latitude()),
-                String.valueOf(a.longitude()),
-                a.address(),
-                a.city(),
-                a.country(),
-                a.accessibility(),
-                String.join(",", a.services()),
-                a.currency(),
-                a.updatedAt().toString()))
-            .sorted()
-            .reduce("", (x, y) -> x + ";" + y);
-
+        MessageDigest digest;
         try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(canonical.getBytes(StandardCharsets.UTF_8));
-            return "\"" + HexFormat.of().formatHex(hash) + "\"";
+            digest = MessageDigest.getInstance("SHA-256");
         } catch (NoSuchAlgorithmException ex) {
             throw new IllegalStateException("SHA-256 not available", ex);
         }
+        byte[] separator = ";".getBytes(StandardCharsets.UTF_8);
+        atms.stream().map(AtmDirectoryController::canonicalRow).sorted().forEach(row -> {
+            digest.update(separator);
+            digest.update(row.getBytes(StandardCharsets.UTF_8));
+        });
+        return "\"" + HexFormat.of().formatHex(digest.digest()) + "\"";
+    }
+
+    private static String canonicalRow(AtmLocation a) {
+        return String.join("|",
+            a.atmId(),
+            a.name(),
+            a.status(),
+            String.valueOf(a.latitude()),
+            String.valueOf(a.longitude()),
+            a.address(),
+            a.city(),
+            a.country(),
+            a.accessibility(),
+            String.join(",", a.services()),
+            a.currency(),
+            a.updatedAt().toString());
     }
 }
