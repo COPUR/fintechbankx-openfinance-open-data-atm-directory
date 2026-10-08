@@ -25,6 +25,18 @@ class AtmDirectoryOpenApiContractTest {
         String yaml = Files.readString(Path.of("api/openapi/atm-directory-service.yaml"));
         String tooMany = yaml.substring(yaml.indexOf("'429':"), yaml.indexOf("'503':"));
 
-        assertThat(tooMany).contains("API gateway", "Retry-After:", "x-fbx-rate-limited:", "- 'true'");
+        assertThat(tooMany).contains("API gateway", "x-fbx-rate-limited:", "- 'true'", "retry with back-off");
+        assertThat(tooMany.replaceAll("\\s+", " "))
+            .as("the limit is one bucket per gateway pod shared by every caller, not a per-client quota")
+            .contains("shared 50 requests per second per gateway pod for all callers");
+    }
+
+    @Test
+    void the429DoesNotPromiseARetryAfterHeaderTheGatewayNeverSends() throws IOException {
+        // The mesh local rate limit (Envoy local_ratelimit) adds only x-fbx-rate-limited.
+        String yaml = Files.readString(Path.of("api/openapi/atm-directory-service.yaml"));
+        String tooMany = yaml.substring(yaml.indexOf("'429':"), yaml.indexOf("'503':"));
+
+        assertThat(tooMany).doesNotContain("Retry-After", "Retry after the given number of seconds");
     }
 }
