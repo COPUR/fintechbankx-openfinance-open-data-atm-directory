@@ -71,7 +71,7 @@ class AtmDirectoryPostgresIT {
     @Test
     void seedLoadsTheThreeSampleAtms() {
         assertThat(directory.findAll()).extracting(AtmLocation::atmId)
-            .containsExactly("ATM-001", "ATM-002", "ATM-003");
+            .containsExactly("SAMPLE-001", "SAMPLE-002", "SAMPLE-003");
         AtmLocation downtown = directory.findAll().getFirst();
         assertThat(downtown.services()).containsExactly("CashWithdrawal", "CashDeposit");
         assertThat(downtown.currency()).isEqualTo("AED");
@@ -82,7 +82,7 @@ class AtmDirectoryPostgresIT {
     void boundingBoxQueryUsesInclusiveEdgesAndExcludesFarAtms() {
         // Edges exactly on Marina (25.08, 55.14) and downtown (25.2048, 55.2708).
         assertThat(directory.findWithin(new GeoBoundingBox(25.08, 25.2048, 55.14, 55.2708)))
-            .extracting(AtmLocation::atmId).containsExactly("ATM-001", "ATM-002");
+            .extracting(AtmLocation::atmId).containsExactly("SAMPLE-001", "SAMPLE-002");
         assertThat(directory.findWithin(new GeoBoundingBox(-10, 10, -10, 10))).isEmpty();
     }
 
@@ -92,7 +92,7 @@ class AtmDirectoryPostgresIT {
             .andExpect(status().isOk())
             .andExpect(header().string("Cache-Control", "no-cache"))
             .andExpect(jsonPath("$.Meta.TotalRecords").value(2))
-            .andExpect(jsonPath("$.Data.ATM[*].AtmId").value(contains("ATM-001", "ATM-002")));
+            .andExpect(jsonPath("$.Data.ATM[*].AtmId").value(contains("SAMPLE-001", "SAMPLE-002")));
 
         mvc.perform(get("/open-finance/v1/atms").header("X-FAPI-Interaction-ID", "it-pg-2"))
             .andExpect(status().isOk())
@@ -116,7 +116,7 @@ class AtmDirectoryPostgresIT {
 
     @Test
     void applicationConnectionsAreReadOnly() {
-        assertThatThrownBy(() -> jdbc.update("delete from sc_of_atm_directory.atm where atm_id = 'ATM-003'"))
+        assertThatThrownBy(() -> jdbc.update("delete from sc_of_atm_directory.atm where atm_id = 'SAMPLE-003'"))
             .hasMessageContaining("read-only");
         assertThat(directory.findAll()).hasSize(3);
     }

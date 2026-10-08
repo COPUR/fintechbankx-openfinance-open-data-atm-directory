@@ -12,8 +12,9 @@
 # when one of its imported fields changed. Re-running the same file changes
 # nothing, so the API ETag stays stable. Any invalid row (coordinates outside
 # the globe, empty services, bad currency, duplicate atm_id) aborts the whole
-# import. ATMs missing from the file are left as they are: decommission an ATM
-# by importing it with its new status.
+# import, and so does an atm_id with the SAMPLE- prefix reserved for the
+# dev/CI seed. ATMs missing from the file are left as they are: decommission an
+# ATM by importing it with its new status.
 #
 # Example conninfo: "host=<aurora-writer> dbname=db_of_atm_directory_dev user=atm_directory_app sslmode=require".
 # Passwords come from PGPASSWORD or ~/.pgpass, never from arguments.
@@ -62,12 +63,17 @@ CREATE TEMP TABLE atm_import (
 \copy atm_import FROM '$csv' WITH (FORMAT csv, HEADER true)
 
 DO \$\$
-DECLARE duplicate text;
+DECLARE duplicate text; reserved text;
 BEGIN
     SELECT string_agg(atm_id, ', ') INTO duplicate
     FROM (SELECT atm_id FROM atm_import GROUP BY atm_id HAVING count(*) > 1) d;
     IF duplicate IS NOT NULL THEN
         RAISE EXCEPTION 'duplicate atm_id in import file: %', duplicate;
+    END IF;
+    -- SAMPLE- ids belong to the dev/CI seed (db/seed); the real network never uses them.
+    SELECT string_agg(atm_id, ', ') INTO reserved FROM atm_import WHERE upper(btrim(atm_id)) LIKE 'SAMPLE-%';
+    IF reserved IS NOT NULL THEN
+        RAISE EXCEPTION 'atm_id uses the reserved SAMPLE- prefix of the dev/CI seed: %', reserved;
     END IF;
 END
 \$\$;
