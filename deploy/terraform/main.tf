@@ -153,8 +153,11 @@ resource "aws_secretsmanager_secret" "app_database" {
 }
 
 # Schema owner atm_directory_migrate: Flyway only (Helm migrate init container).
-resource "aws_secretsmanager_secret" "migrate_database" {
-  name                    = "${var.environment}/${local.service_slug}/db-migrate"
+# Name per the platform contract's database-roles pattern (<env>/<slug>/db-migration).
+# Created here because this service declares its own Aurora cluster; the
+# aurora-postgresql module that creates it for other services is not used.
+resource "aws_secretsmanager_secret" "migration_database" {
+  name                    = "${var.environment}/${local.service_slug}/db-migration"
   description             = "Schema owner credential (atm_directory_migrate, Flyway only) for ${local.service_id}"
   kms_key_id              = aws_kms_key.database.arn
   recovery_window_in_days = 7

@@ -58,7 +58,7 @@ spec:
             matchLabels:
               {{- include "atm.selectorLabels" . | nindent 14 }}
       initContainers:
-        # Flyway with the schema owner's credential (secret db-migrate); exits when the
+        # Flyway with the schema owner's credential (secret db-migration); exits when the
         # schema is current. The service container below never holds this credential.
         - name: migrate
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
@@ -78,7 +78,7 @@ spec:
             - name: SPRING_DATASOURCE_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "atm.migrateSecretName" . }}
+                  name: {{ include "atm.migrationSecretName" . }}
                   key: SPRING_DATASOURCE_PASSWORD
             {{- end }}
           resources:

@@ -9,7 +9,7 @@
 -- (psql \password <role>) and stores {"username","password"} in Secrets Manager:
 --
 --   role                   secret                                   used by
---   atm_directory_migrate  <env>/atm-directory-service/db-migrate   Flyway only (Helm init container); owns the schema
+--   atm_directory_migrate  <env>/atm-directory-service/db-migration   Flyway only (Helm init container); owns the schema
 --   atm_directory_app      <env>/atm-directory-service/db-app       the service pods; SELECT on atm, nothing else
 --   atm_directory_import   <env>/atm-directory-service/db-import    db/import/import-atms.sh; SELECT/INSERT/UPDATE on atm
 --

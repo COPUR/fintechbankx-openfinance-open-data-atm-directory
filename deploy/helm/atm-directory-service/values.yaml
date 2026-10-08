@@ -70,9 +70,9 @@ externalSecret:
     name: aws-secrets-manager
   # Secrets Manager secret <env>/atm-directory-service/db-app (deploy/terraform output app_db_secret_name).
   remoteSecretName: ""
-  # Secrets Manager secret <env>/atm-directory-service/db-migrate (output migrate_db_secret_name);
+  # Secrets Manager secret <env>/atm-directory-service/db-migration (output migration_db_secret_name);
   # only the migrate init container reads it.
-  migrateRemoteSecretName: ""
+  migrationRemoteSecretName: ""
   refreshInterval: 1h
 
 topologySpread:

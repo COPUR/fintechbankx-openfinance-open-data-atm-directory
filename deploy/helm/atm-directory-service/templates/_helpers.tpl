@@ -18,8 +18,8 @@ helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version }}
 {{ include "atm.name" . }}-db
 {{- end -}}
 
-{{- define "atm.migrateSecretName" -}}
-{{ include "atm.name" . }}-db-migrate
+{{- define "atm.migrationSecretName" -}}
+{{ include "atm.name" . }}-db-migration
 {{- end -}}
 
 {{/* Container hardening shared by the migration init container and the service. */}}

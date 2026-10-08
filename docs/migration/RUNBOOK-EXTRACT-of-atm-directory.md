@@ -33,7 +33,7 @@ The monolith must not read `sc_of_atm_directory`; consumers use the HTTP API.
 
    | Role | Secret (Terraform output) | Used by | Privileges |
    |---|---|---|---|
-   | `atm_directory_migrate` | `<env>/atm-directory-service/db-migrate` (`migrate_db_secret_name`) | Flyway in the `migrate` init container | owns `sc_of_atm_directory` |
+   | `atm_directory_migrate` | `<env>/atm-directory-service/db-migration` (`migration_db_secret_name`) | Flyway in the `migrate` init container | owns `sc_of_atm_directory` |
    | `atm_directory_app` | `<env>/atm-directory-service/db-app` (`app_db_secret_name`) | service container | `USAGE` on the schema, `SELECT` on `atm` |
    | `atm_directory_import` | `<env>/atm-directory-service/db-import` (`import_db_secret_name`) | operator running the import | `USAGE`, `SELECT`/`INSERT`/`UPDATE` on `atm`, `TEMPORARY` |
 
@@ -41,7 +41,7 @@ The monolith must not read `sc_of_atm_directory`; consumers use the HTTP API.
    role was created after the first deploy, re-run that file with psql as
    `atm_directory_migrate`.
 2. Deploy the chart with `externalSecret.remoteSecretName`,
-   `externalSecret.migrateRemoteSecretName`, `config.DB_URL` (reader) and
+   `externalSecret.migrationRemoteSecretName`, `config.DB_URL` (reader) and
    `config.FLYWAY_URL` (writer). The `migrate` init container creates or updates
    `sc_of_atm_directory` and exits; the service container starts with Flyway off.
 3. Export the network from the ATM operations source as CSV with the header in
