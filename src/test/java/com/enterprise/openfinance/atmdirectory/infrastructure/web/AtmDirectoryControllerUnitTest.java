@@ -106,6 +106,17 @@ class AtmDirectoryControllerUnitTest {
     }
 
     @Test
+    void clientDisconnectIsNotReportedAsAServerError() throws Exception {
+        when(atmDirectoryUseCase.listAtms(any())).thenAnswer(invocation -> {
+            throw new org.springframework.web.context.request.async.AsyncRequestNotUsableException("connection reset");
+        });
+
+        mockMvc.perform(get("/open-finance/v1/atms").header("X-FAPI-Interaction-ID", "it-006"))
+            .andExpect(status().isOk())
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content().string(""));
+    }
+
+    @Test
     void unexpectedErrorIsA500WithoutDetails() throws Exception {
         when(atmDirectoryUseCase.listAtms(any())).thenThrow(new IllegalStateException("boom"));
 

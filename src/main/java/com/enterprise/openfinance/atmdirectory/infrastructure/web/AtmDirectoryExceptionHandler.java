@@ -12,9 +12,11 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
-@ControllerAdvice
+/** Error mapping for the public ATM API only; actuator endpoints keep Spring's defaults. */
+@ControllerAdvice(assignableTypes = AtmDirectoryController.class)
 public class AtmDirectoryExceptionHandler {
 
     private static final Logger LOG = LoggerFactory.getLogger(AtmDirectoryExceptionHandler.class);
@@ -42,6 +44,12 @@ public class AtmDirectoryExceptionHandler {
             .header(HttpHeaders.RETRY_AFTER, "5")
             .body(new ErrorResponse("SERVICE_UNAVAILABLE", "ATM directory is temporarily unavailable",
                 interactionId(request), Instant.now()));
+    }
+
+    /** The client went away mid-response; there is no one to answer and nothing to alert on. */
+    @ExceptionHandler(AsyncRequestNotUsableException.class)
+    public void handleClientGone(AsyncRequestNotUsableException ex) {
+        LOG.debug("Client disconnected: {}", ex.getMessage());
     }
 
     @ExceptionHandler(Exception.class)
