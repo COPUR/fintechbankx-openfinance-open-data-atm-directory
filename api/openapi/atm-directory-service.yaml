@@ -58,13 +58,12 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '429':
           description: >-
-            Too many requests. Sent by the API gateway, not by the service: the mesh ingress
-            rate-limits this anonymous route with a token bucket of 100 requests refilled at
-            50 per second, per gateway pod. Retry after the given number of seconds.
+            Too many requests. Sent by the API gateway, not by the service. The mesh ingress
+            rate-limits this anonymous route with a shared 50 requests per second per gateway
+            pod for all callers (token bucket of 100, refilled with 50 every second): it is not
+            a per-client quota, so one busy caller can exhaust it for everyone. No retry delay
+            is advertised; retry with back-off (exponential, with jitter).
           headers:
-            Retry-After:
-              schema:
-                type: integer
             x-fbx-rate-limited:
               description: Set by the gateway when it rejected the request for the rate limit.
               schema:

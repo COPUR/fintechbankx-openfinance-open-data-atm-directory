@@ -10,7 +10,7 @@ Extraction of the ATM directory from `enterprise-loan-management-system` into
 | Slice | Public ATM directory: list and radius search (`GET /open-finance/v1/atms`) |
 | Owned data | `db_of_atm_directory_<env>`, schema `sc_of_atm_directory`: `atm` |
 | Events | none (outbox and `evt.of.atm.*` deferred, ADR-0001) |
-| Depends on | its own PostgreSQL at runtime; the mesh ingress gateway rate limit on `/open-finance/v1/atms` (platform mesh PR #11, commit `5e756f0`), which is the only abuse control on this anonymous route: the service validates and bounds `lat`, `long` and `radius` but does not throttle, and the gateway answers `429` with `Retry-After` |
+| Depends on | its own PostgreSQL at runtime; the mesh ingress gateway rate limit on `/open-finance/v1/atms` (platform mesh PR #11, commit `5e756f0`), which is the only abuse control on this anonymous route: the service validates and bounds `lat`, `long` and `radius` but does not throttle, and the gateway answers `429` with `x-fbx-rate-limited: true` and no `Retry-After` (clients retry with back-off) |
 
 ## 1. Data ownership split
 
@@ -81,7 +81,7 @@ route back to the monolith.
 
 | Dependency | Why |
 |---|---|
-| Platform mesh PR #11 (rate limit in commit `5e756f0`) | gateway route `/open-finance/v1/atms` to `atm-directory-service.open-finance.svc.cluster.local:8080` and the ingress rate limit (100-token bucket, 50/s per gateway pod, `429` + `Retry-After` + `x-fbx-rate-limited: true`), the only abuse control on this anonymous route |
+| Platform mesh PR #11 (rate limit in commit `5e756f0`) | gateway route `/open-finance/v1/atms` to `atm-directory-service.open-finance.svc.cluster.local:8080` and the ingress rate limit (100-token bucket, a shared 50 req/s per gateway pod for all callers, `429` + `x-fbx-rate-limited: true`, no `Retry-After`), the only abuse control on this anonymous route |
 | Platform mesh NetworkPolicy for `open-finance` | the mesh repository owns NetworkPolicy (platform cicd-templates `1dd1138` turns chart policies off by default). The chart's own policy is opt-in: set `networkPolicy.enabled=true` and `networkPolicy.databaseCidrs` (Aurora subnets) only where the mesh repository does not cover the namespace; the policy then needs mesh sign-off |
 | `ClusterSecretStore` `aws-secrets-manager` | External Secrets Operator syncs `db-app` (service) and `db-migration` (init container); without it the pods never start |
 | DBA bootstrap and Terraform (section 2) | roles, grants, secrets, Aurora |
