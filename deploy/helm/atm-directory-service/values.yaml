@@ -82,11 +82,14 @@ topologySpread:
   maxSkew: 1
 
 networkPolicy:
-  enabled: true
+  # Opt-in. The platform mesh repository owns NetworkPolicy (cicd-templates
+  # 1dd1138 turns chart policies off by default); enable only where the mesh
+  # repository does not already cover this namespace.
+  enabled: false
   # API traffic only from the ingress gateway; metrics only from Prometheus.
   gatewayNamespace: istio-ingress
   prometheusNamespace: observability
   # Aurora subnets (private_subnet_ids CIDRs); PostgreSQL is reached on 5432 only.
-  # Required: rendering fails while this list is empty.
+  # Required when enabled: rendering fails while this list is empty.
   databaseCidrs: []
   istiodNamespace: istio-system

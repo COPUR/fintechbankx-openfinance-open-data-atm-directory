@@ -82,6 +82,7 @@ route back to the monolith.
 | Dependency | Why |
 |---|---|
 | Platform mesh PR #11 (rate limit in commit `5e756f0`) | gateway route `/open-finance/v1/atms` to `atm-directory-service.open-finance.svc.cluster.local:8080` and the ingress rate limit (100-token bucket, 50/s per gateway pod, `429` + `Retry-After` + `x-fbx-rate-limited: true`), the only abuse control on this anonymous route |
+| Platform mesh NetworkPolicy for `open-finance` | the mesh repository owns NetworkPolicy (platform cicd-templates `1dd1138` turns chart policies off by default). The chart's own policy is opt-in: set `networkPolicy.enabled=true` and `networkPolicy.databaseCidrs` (Aurora subnets) only where the mesh repository does not cover the namespace; the policy then needs mesh sign-off |
 | `ClusterSecretStore` `aws-secrets-manager` | External Secrets Operator syncs `db-app` (service) and `db-migration` (init container); without it the pods never start |
 | DBA bootstrap and Terraform (section 2) | roles, grants, secrets, Aurora |
 | A signed-off network file | first `--full` import (section 2) |
