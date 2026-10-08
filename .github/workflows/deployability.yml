@@ -41,6 +41,15 @@ jobs:
           helm lint "$chart" $args
           helm template ci "$chart" $args > /dev/null
           helm template ci "$chart" -f "$chart/values-dev.yaml" $args > /dev/null
+      - name: Chart refuses an empty database CIDR list
+        run: |
+          chart=deploy/helm/atm-directory-service
+          if helm template ci "$chart" --namespace open-finance --set image.repository=ci/x --set image.tag=x \
+               --set externalSecret.remoteSecretName=x --set externalSecret.migrationRemoteSecretName=x \
+               --set config.DB_URL=jdbc:postgresql://ci:5432/x > /dev/null 2>&1; then
+            echo "networkPolicy.databaseCidrs must be required"
+            exit 1
+          fi
 
   terraform:
     name: deploy/terraform

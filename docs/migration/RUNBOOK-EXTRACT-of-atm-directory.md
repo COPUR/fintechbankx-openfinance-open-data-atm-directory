@@ -40,6 +40,9 @@ The monolith must not read `sc_of_atm_directory`; consumers use the HTTP API.
    Flyway grants the table privileges (`V3__grant_least_privilege.sql`). If a
    role was created after the first deploy, re-run that file with psql as
    `atm_directory_migrate`.
+   Rotation: change the password in PostgreSQL and in its secret, then
+   `helm upgrade ... --set externalSecret.rotation=<date>`; the changed
+   `checksum/secret` rolls the pods onto the new credential.
 2. Deploy the chart with `externalSecret.remoteSecretName`,
    `externalSecret.migrationRemoteSecretName`, `config.DB_URL` (reader) and
    `config.FLYWAY_URL` (writer). The `migrate` init container creates or updates
