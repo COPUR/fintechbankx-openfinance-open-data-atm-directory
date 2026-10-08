@@ -22,7 +22,7 @@ public class JpaAtmDirectoryAdapter implements AtmDirectoryPort {
 
     @Override
     public List<AtmLocation> findAll() {
-        return read(repository::findAllByOrderByAtmIdAsc);
+        return read(repository::findListedOrderByAtmId);
     }
 
     @Override

@@ -10,12 +10,15 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 interface SpringDataAtmRepository extends Repository<AtmJpaEntity, String> {
 
-    List<AtmJpaEntity> findAllByOrderByAtmIdAsc();
+    /** Listed ATMs: every status except Withdrawn (AtmLocation.STATUS_WITHDRAWN). */
+    @Query(value = "select * from atm where status <> 'Withdrawn' order by atm_id", nativeQuery = true)
+    List<AtmJpaEntity> findListedOrderByAtmId();
 
-    /** Served by the GiST index ix_atm_location on point(longitude, latitude). */
+    /** Served by the GiST index ix_atm_location on point(longitude, latitude); Withdrawn ATMs are left out. */
     @Query(value = """
         select * from atm
         where point(longitude, latitude) <@ box(point(:minLon, :minLat), point(:maxLon, :maxLat))
+          and status <> 'Withdrawn'
         order by atm_id
         """, nativeQuery = true)
     List<AtmJpaEntity> findInBox(@Param("minLat") double minLat, @Param("maxLat") double maxLat,

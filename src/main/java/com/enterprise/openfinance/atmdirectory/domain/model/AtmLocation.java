@@ -23,6 +23,12 @@ public record AtmLocation(
     String currency,
     Instant updatedAt
 ) {
+    /**
+     * Status of an ATM that left the network: set by a full import for every ATM missing
+     * from the signed-off file. A withdrawn ATM is kept for history but never listed.
+     */
+    public static final String STATUS_WITHDRAWN = "Withdrawn";
+
     private static final Pattern ISO_4217 = Pattern.compile("[A-Z]{3}");
 
     public AtmLocation {

@@ -134,6 +134,31 @@ class AtmDirectoryPostgresIT {
         assertThat(body).doesNotContain("evil.example");
     }
 
+    /** Port-level predicate test: a withdrawn ATM (full import) is never listed, inside the box or not. */
+    @Test
+    void withdrawnAtmsAreNotListedByThePort() {
+        JdbcTemplate writable = writableJdbc();
+        writable.update("""
+            insert into sc_of_atm_directory.atm (atm_id, name, status, latitude, longitude, address_line, city,
+              country_code, accessibility, services, currency)
+            values ('IT-WD-1', 'Closed Downtown ATM', 'Withdrawn', 25.2000, 55.2700, 'Road', 'Dubai', 'AE', 'Standard',
+                    ARRAY['CashWithdrawal'], 'AED')
+            on conflict (atm_id) do update set status = 'Withdrawn'
+            """);
+        try {
+            assertThat(directory.findAll()).extracting(AtmLocation::atmId).doesNotContain("IT-WD-1")
+                .contains("SAMPLE-001");
+            assertThat(directory.findWithin(new GeoBoundingBox(25.19, 25.21, 55.26, 55.28)))
+                .extracting(AtmLocation::atmId).containsExactly("SAMPLE-001");
+
+            writable.update("update sc_of_atm_directory.atm set status = 'InService' where atm_id = 'IT-WD-1'");
+            assertThat(directory.findWithin(new GeoBoundingBox(25.19, 25.21, 55.26, 55.28)))
+                .extracting(AtmLocation::atmId).containsExactly("IT-WD-1", "SAMPLE-001");
+        } finally {
+            writable.update("delete from sc_of_atm_directory.atm where atm_id = 'IT-WD-1'");
+        }
+    }
+
     @Test
     void everyWriteToTheDirectoryLandsInTheAppendOnlyHistory() {
         // One connection, so the session's application_name reaches the trigger.

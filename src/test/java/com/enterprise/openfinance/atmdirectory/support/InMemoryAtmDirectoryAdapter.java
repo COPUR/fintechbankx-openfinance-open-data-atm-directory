@@ -26,7 +26,9 @@ public class InMemoryAtmDirectoryAdapter implements AtmDirectoryPort {
     }
 
     public InMemoryAtmDirectoryAdapter(List<AtmLocation> atms) {
-        this.atms = atms.stream().sorted(Comparator.comparing(AtmLocation::atmId)).toList();
+        this.atms = atms.stream()
+            .filter(atm -> !AtmLocation.STATUS_WITHDRAWN.equals(atm.status()))
+            .sorted(Comparator.comparing(AtmLocation::atmId)).toList();
     }
 
     @Override

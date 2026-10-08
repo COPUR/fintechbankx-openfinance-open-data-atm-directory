@@ -30,6 +30,8 @@ The service has no write use case today; the network is maintained outside it.
    `classpath:db/seed` and load only when `ATM_DIRECTORY_SEED_ENABLED=true`
    (dev, CI). The real network is loaded with `db/import/import-atms.sh`, an
    idempotent upsert that bumps `version` and `updated_at` only for changed rows.
+   In full mode (`--full`) the file is the whole network: ATMs missing from it
+   get status `Withdrawn`, which the out-port never lists; nothing is deleted.
 4. **No outbox and no events yet.** Without a write or import use case inside the
    service there is no domain fact to publish. A transactional outbox and
    compacted state topics `evt.of.atm.*` are deferred until such a use case

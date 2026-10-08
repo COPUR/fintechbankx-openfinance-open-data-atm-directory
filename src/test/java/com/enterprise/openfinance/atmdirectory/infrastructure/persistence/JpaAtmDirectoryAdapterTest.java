@@ -25,7 +25,7 @@ class JpaAtmDirectoryAdapterTest {
 
     @Test
     void findAllMapsRowsToTheDomain() {
-        when(repository.findAllByOrderByAtmIdAsc()).thenReturn(List.of(AtmPersistenceMapper.toEntity(DOWNTOWN, 0)));
+        when(repository.findListedOrderByAtmId()).thenReturn(List.of(AtmPersistenceMapper.toEntity(DOWNTOWN, 0)));
 
         assertThat(adapter.findAll()).containsExactly(DOWNTOWN);
     }
@@ -40,7 +40,7 @@ class JpaAtmDirectoryAdapterTest {
 
     @Test
     void storeFailuresBecomeADomainUnavailableError() {
-        when(repository.findAllByOrderByAtmIdAsc()).thenThrow(new DataAccessResourceFailureException("connection refused"));
+        when(repository.findListedOrderByAtmId()).thenThrow(new DataAccessResourceFailureException("connection refused"));
         when(repository.findInBox(0, 1, 0, 1)).thenThrow(new CannotCreateTransactionException("pool exhausted"));
 
         assertThatThrownBy(adapter::findAll).isInstanceOf(AtmDirectoryUnavailableException.class)

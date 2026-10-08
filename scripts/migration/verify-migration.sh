@@ -37,7 +37,11 @@ as_role() {
 }
 # Flyway labels its session atm-directory-flyway (spring.flyway.init-sqls).
 in_schema() { PGAPPNAME=atm-directory-flyway as_role atm_directory_migrate "$@"; }
-import_as() { PGUSER=atm_directory_import PGPASSWORD="$pw_import" "$root/db/import/import-atms.sh" "dbname=$db" "$@"; }
+# import_as [options...] <csv>: run the import as atm_directory_import.
+import_as() {
+  local csv="${*: -1}"
+  PGUSER=atm_directory_import PGPASSWORD="$pw_import" "$root/db/import/import-atms.sh" "${@:1:$#-1}" "dbname=$db" "$csv"
+}
 
 psql_q -d postgres -c "DROP DATABASE IF EXISTS $db" -c "CREATE DATABASE $db"
 echo "--- DBA bootstrap (db/bootstrap/bootstrap-roles.sql)"
@@ -133,6 +137,26 @@ check "invalid import rolled back as a whole" \
   "SELECT status || ':v' || version || ':' || (SELECT count(*) FROM $schema.atm WHERE atm_id = 'ATM-900') FROM $schema.atm WHERE atm_id = 'ATM-102'" \
   "InService:v0:0"
 
+echo "--- full import (signed-off file is the whole network)"
+grep -v '^ATM-102,' "$root/db/import/example-atms.csv" > "$work/full-without-102.csv"
+before_full="$(psql -X -At -d "$db" -c "$imported_rows")"
+if import_as --full "$work/full-without-102.csv" 2>"$work/full.err"; then
+  echo "FAIL full import withdrew 1 of 4 ATMs (25 %) past the default 10 % guard" >&2
+  exit 1
+fi
+grep -q "would withdraw 1 of 4 listed ATMs" "$work/full.err" || { cat "$work/full.err" >&2; exit 1; }
+check "guarded full import changed nothing" "$imported_rows" "$before_full"
+import_as --full --max-withdraw-percent 25 "$work/full-without-102.csv"
+check "ATM missing from the full file is withdrawn, the rest unchanged" "$versions" \
+  "ATM-002:OutOfService:v2,ATM-003:OutOfService:v0,ATM-101:InService:v0,ATM-102:Withdrawn:v1,SAMPLE-001:InService:v0,SAMPLE-002:InService:v0,SAMPLE-003:OutOfService:v0"
+import_as --full --max-withdraw-percent 25 "$work/full-without-102.csv"
+check "repeated full import changes nothing" \
+  "SELECT version FROM $schema.atm WHERE atm_id = 'ATM-102'" "1"
+import_as "$root/db/import/example-atms.csv"
+check "a withdrawn ATM that reappears is listed again" \
+  "SELECT status || ':v' || version FROM $schema.atm WHERE atm_id = 'ATM-102'" "InService:v2"
+check "full mode never touches SAMPLE- rows" "$sample_rows" "$after_seed"
+
 denied() {
   local label="$1" role="$2" sql="$3"
   if as_role "$role" -c "$sql" >/dev/null 2>"$work/denied.err"; then
@@ -161,13 +185,13 @@ check "runtime and import roles own nothing" \
 
 echo "--- audit trail"
 check "every import insert and update is in the history with role and application" \
-  "SELECT count(*) FILTER (WHERE operation = 'INSERT') || ':' || count(*) FILTER (WHERE operation = 'UPDATE') FROM $schema.atm_history WHERE changed_by = 'atm_directory_import' AND application_name = 'atm-directory-import'" "4:1"
+  "SELECT count(*) FILTER (WHERE operation = 'INSERT') || ':' || count(*) FILTER (WHERE operation = 'UPDATE') FROM $schema.atm_history WHERE changed_by = 'atm_directory_import' AND application_name = 'atm-directory-import'" "4:4"
 check "the update keeps the old and the new row" \
-  "SELECT (old_row->>'status') || '>' || (new_row->>'status') FROM $schema.atm_history WHERE operation = 'UPDATE' AND atm_id = 'ATM-002'" "OutOfService>InService"
+  "SELECT string_agg((old_row->>'status') || '>' || (new_row->>'status'), ',' ORDER BY history_id) FROM $schema.atm_history WHERE operation = 'UPDATE' AND atm_id IN ('ATM-002', 'ATM-102')" "OutOfService>InService,InService>OutOfService,InService>Withdrawn,Withdrawn>InService"
 check "seed inserts are attributed to the migration role" \
   "SELECT count(*) || ':' || min(application_name) FROM $schema.atm_history WHERE atm_id LIKE 'SAMPLE-%' AND changed_by = 'atm_directory_migrate'" "3:atm-directory-flyway"
 
-plan="$(PGOPTIONS="-c enable_seqscan=off" psql -X -At -d "$db" -c "EXPLAIN (COSTS OFF) SELECT atm_id FROM $schema.atm WHERE point(longitude, latitude) <@ box(point(55.0, 24.9), point(55.5, 25.4))")"
+plan="$(PGOPTIONS="-c enable_seqscan=off" psql -X -At -d "$db" -c "EXPLAIN (COSTS OFF) SELECT atm_id FROM $schema.atm WHERE point(longitude, latitude) <@ box(point(55.0, 24.9), point(55.5, 25.4)) AND status <> 'Withdrawn'")"
 if ! grep -q "Index Scan using ix_atm_location" <<<"$plan"; then
   echo "FAIL radius pre-filter does not use the GiST index:" >&2
   echo "$plan" >&2

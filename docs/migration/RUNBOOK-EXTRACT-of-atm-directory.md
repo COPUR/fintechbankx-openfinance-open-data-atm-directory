@@ -53,7 +53,13 @@ The monolith must not read `sc_of_atm_directory`; consumers use the HTTP API.
 
 Re-imports are safe at any time: changed rows get `version + 1` and a new
 `updated_at`, identical rows are untouched, an invalid row aborts the whole
-file. ATMs missing from a file are not deleted; import them with their new status.
+file. By default ATMs missing from a file are left as they are (delta mode).
+When the operations source signs off the complete network, import with
+`--full`: every listed ATM missing from the file becomes `Withdrawn` and is no
+longer returned by the API (it is listed again if it reappears). The run is
+rolled back if it would withdraw more than 10 % of the listed ATMs
+(`--max-withdraw-percent N` to override after checking the export). ATMs are
+never deleted.
 Every inserted or updated row is recorded in `sc_of_atm_directory.atm_history`
 (old and new row, login role, `application_name`, time); the table is
 append-only and readable only by the schema owner.
