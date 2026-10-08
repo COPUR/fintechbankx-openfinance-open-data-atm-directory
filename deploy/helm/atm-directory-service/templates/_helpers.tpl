@@ -17,3 +17,15 @@ helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version }}
 {{- define "atm.secretName" -}}
 {{ include "atm.name" . }}-db
 {{- end -}}
+
+{{- define "atm.migrateSecretName" -}}
+{{ include "atm.name" . }}-db-migrate
+{{- end -}}
+
+{{/* Container hardening shared by the migration init container and the service. */}}
+{{- define "atm.containerSecurityContext" -}}
+allowPrivilegeEscalation: false
+readOnlyRootFilesystem: true
+capabilities:
+  drop: ["ALL"]
+{{- end -}}

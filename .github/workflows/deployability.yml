@@ -37,7 +37,7 @@ jobs:
       - name: Lint and render chart
         run: |
           chart=deploy/helm/atm-directory-service
-          args="--namespace open-finance --set image.repository=ci/atm-directory-service --set image.tag=${{ github.sha }} --set externalSecret.remoteSecretName=ci/atm-directory-service/db-app --set networkPolicy.databaseCidrs={10.0.0.0/24} --set config.DB_URL=jdbc:postgresql://ci:5432/db_of_atm_directory_ci"
+          args="--namespace open-finance --set image.repository=ci/atm-directory-service --set image.tag=${{ github.sha }} --set externalSecret.remoteSecretName=ci/atm-directory-service/db-app --set externalSecret.migrateRemoteSecretName=ci/atm-directory-service/db-migrate --set networkPolicy.databaseCidrs={10.0.0.0/24} --set config.DB_URL=jdbc:postgresql://ci:5432/db_of_atm_directory_ci"
           helm lint "$chart" $args
           helm template ci "$chart" $args > /dev/null
           helm template ci "$chart" -f "$chart/values-dev.yaml" $args > /dev/null

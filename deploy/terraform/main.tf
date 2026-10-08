@@ -138,13 +138,33 @@ resource "aws_rds_cluster_instance" "database" {
   promotion_tier                        = count.index
 }
 
-# Application credential (role atm_directory_app, owner of schema
-# sc_of_atm_directory). The DBA bootstrap in docs/migration creates the role
-# and writes {"username", "password"} here; Terraform never sees the value.
-# Name follows the platform contract: <env>/<service-slug>/db-app.
+# Database credentials, one per role (db/bootstrap/bootstrap-roles.sql). The
+# DBA bootstrap in docs/migration creates the roles and writes
+# {"username", "password"} into each secret; Terraform never sees a value.
+# Names follow the platform contract <env>/<service-slug>/db-<purpose>; all
+# use the tagged key above so External Secrets Operator can decrypt them.
+
+# Runtime role atm_directory_app: SELECT on atm only.
 resource "aws_secretsmanager_secret" "app_database" {
   name                    = "${var.environment}/${local.service_slug}/db-app"
-  description             = "Application database credential for ${local.service_id}"
+  description             = "Runtime database credential (atm_directory_app, SELECT only) for ${local.service_id}"
+  kms_key_id              = aws_kms_key.database.arn
+  recovery_window_in_days = 7
+}
+
+# Schema owner atm_directory_migrate: Flyway only (Helm migrate init container).
+resource "aws_secretsmanager_secret" "migrate_database" {
+  name                    = "${var.environment}/${local.service_slug}/db-migrate"
+  description             = "Schema owner credential (atm_directory_migrate, Flyway only) for ${local.service_id}"
+  kms_key_id              = aws_kms_key.database.arn
+  recovery_window_in_days = 7
+}
+
+# Import role atm_directory_import: SELECT/INSERT/UPDATE on atm, for db/import/import-atms.sh.
+# Read by the operator who runs the import, never synced into the cluster.
+resource "aws_secretsmanager_secret" "import_database" {
+  name                    = "${var.environment}/${local.service_slug}/db-import"
+  description             = "ATM import credential (atm_directory_import) for ${local.service_id}"
   kms_key_id              = aws_kms_key.database.arn
   recovery_window_in_days = 7
 }

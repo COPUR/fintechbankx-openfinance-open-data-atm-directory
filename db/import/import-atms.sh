@@ -16,7 +16,10 @@
 # dev/CI seed. ATMs missing from the file are left as they are: decommission an
 # ATM by importing it with its new status.
 #
-# Example conninfo: "host=<aurora-writer> dbname=db_of_atm_directory_dev user=atm_directory_app sslmode=require".
+# Runs as the import role atm_directory_import (SELECT/INSERT/UPDATE on atm only;
+# secret <env>/atm-directory-service/db-import). Every inserted or updated row is
+# recorded in atm_history with the login role, application name and time.
+# Example conninfo: "host=<aurora-writer> dbname=db_of_atm_directory_dev user=atm_directory_import sslmode=require".
 # Passwords come from PGPASSWORD or ~/.pgpass, never from arguments.
 set -euo pipefail
 
@@ -24,6 +27,9 @@ if [ "$#" -ne 2 ]; then
   echo "usage: $0 <conninfo> <atms.csv>" >&2
   exit 2
 fi
+
+# Recorded in sc_of_atm_directory.atm_history.application_name for every row this run changes.
+export PGAPPNAME="${PGAPPNAME:-atm-directory-import}"
 
 conninfo="$1"
 csv="$2"

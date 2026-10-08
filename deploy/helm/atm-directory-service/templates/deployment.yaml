@@ -31,6 +31,9 @@ spec:
         prometheus.io/scrape: "true"
         prometheus.io/port: {{ .Values.service.managementPort | quote }}
         prometheus.io/path: /actuator/prometheus
+        # The migrate init container runs before the Istio sidecar exists; Aurora is outside
+        # the mesh and is reached with TLS (sslmode=require), so 5432 bypasses the proxy.
+        traffic.sidecar.istio.io/excludeOutboundPorts: "5432"
     spec:
       serviceAccountName: {{ .Values.serviceAccount.name }}
       terminationGracePeriodSeconds: 45
@@ -54,6 +57,37 @@ spec:
           labelSelector:
             matchLabels:
               {{- include "atm.selectorLabels" . | nindent 14 }}
+      initContainers:
+        # Flyway with the schema owner's credential (secret db-migrate); exits when the
+        # schema is current. The service container below never holds this credential.
+        - name: migrate
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args: ["--spring.main.web-application-type=none"]
+          envFrom:
+            - configMapRef:
+                name: {{ include "atm.name" . }}
+          env:
+            - name: DB_USERNAME
+              value: {{ required "migration.username is required" .Values.migration.username | quote }}
+            {{- with .Values.config.FLYWAY_URL }}
+            - name: DB_URL
+              value: {{ . | quote }}
+            {{- end }}
+            {{- if .Values.externalSecret.enabled }}
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "atm.migrateSecretName" . }}
+                  key: SPRING_DATASOURCE_PASSWORD
+            {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          securityContext:
+            {{- include "atm.containerSecurityContext" . | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
       containers:
         - name: atm-directory-service
           image: "{{ required "image.repository is required" .Values.image.repository }}:{{ required "image.tag is required" .Values.image.tag }}"
@@ -70,6 +104,10 @@ spec:
             - secretRef:
                 name: {{ include "atm.secretName" . }}
             {{- end }}
+          env:
+            # Migrations ran in the init container; the runtime role may only SELECT.
+            - name: SPRING_FLYWAY_ENABLED
+              value: "false"
           startupProbe:
             httpGet:
               path: /actuator/health/liveness
@@ -95,10 +133,7 @@ spec:
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           securityContext:
-            allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: true
-            capabilities:
-              drop: ["ALL"]
+            {{- include "atm.containerSecurityContext" . | nindent 12 }}
           volumeMounts:
             - name: tmp
               mountPath: /tmp

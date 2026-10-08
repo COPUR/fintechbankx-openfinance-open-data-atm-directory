@@ -46,6 +46,8 @@ spring:
     url: ${FLYWAY_URL:${spring.datasource.url}}
     user: ${FLYWAY_USER:${spring.datasource.username}}
     password: ${FLYWAY_PASSWORD:${spring.datasource.password:}}
+    # Names the session in sc_of_atm_directory.atm_history.application_name (seed rows).
+    init-sqls: SET application_name = 'atm-directory-flyway'
 
 server:
   port: 8080

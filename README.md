@@ -48,9 +48,10 @@ Bu repository, FinTechBankX DDD/EDA dönüşümünde **svc-of-atm-directory** se
 | What | Command / path |
 |---|---|
 | Unit and integration tests | `./gradlew check` (PostgreSQL integration tests run when `TEST_DB_URL`, `TEST_DB_USERNAME`, `TEST_DB_PASSWORD` are set, otherwise they are skipped) |
-| Run locally | `SPRING_DATASOURCE_PASSWORD=... ATM_DIRECTORY_SEED_ENABLED=true ./gradlew bootRun` (PostgreSQL `db_of_atm_directory_local`, user `atm_directory_app`) |
+| Run locally | `DB_USERNAME=<owner> SPRING_DATASOURCE_PASSWORD=... ATM_DIRECTORY_SEED_ENABLED=true ./gradlew bootRun` (PostgreSQL `db_of_atm_directory_local`; locally one owner role may run Flyway and the service) |
+| Database roles | `db/bootstrap/bootstrap-roles.sql`: `atm_directory_migrate` (Flyway, init container), `atm_directory_app` (runtime, SELECT only), `atm_directory_import` (import script) |
 | Database migrations | `src/main/resources/db/migration` (schema `sc_of_atm_directory`); sample data in `db/seed` (dev/CI only) |
-| Load the ATM network | `db/import/import-atms.sh "<conninfo>" atms.csv` (format: `db/import/example-atms.csv`) |
+| Load the ATM network | `db/import/import-atms.sh "<conninfo as atm_directory_import>" atms.csv` (format: `db/import/example-atms.csv`) |
 | Rehearse migrations and import | `PGHOST=... PGUSER=... PGPASSWORD=... scripts/migration/verify-migration.sh` |
 | Container image | `docker build -t atm-directory-service .` |
 | Kubernetes | `deploy/helm/atm-directory-service` (namespace `open-finance`) |

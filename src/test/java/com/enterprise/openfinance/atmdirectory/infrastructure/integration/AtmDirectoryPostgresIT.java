@@ -63,7 +63,7 @@ class AtmDirectoryPostgresIT {
             "select table_name from information_schema.tables where table_name like 'outbox%' and table_schema = ?",
             String.class, SCHEMA);
 
-        assertThat(tables).containsExactly("atm");
+        assertThat(tables).containsExactly("atm", "atm_history");
         assertThat(indexes).containsExactly("ix_atm_country_city", "ix_atm_location", "ix_atm_status", "pk_atm");
         assertThat(outbox).as("no outbox until a write use case exists (ADR-0001)").isEmpty();
     }
@@ -132,6 +132,31 @@ class AtmDirectoryPostgresIT {
             .andReturn().getResponse().getContentAsString();
 
         assertThat(body).doesNotContain("evil.example");
+    }
+
+    @Test
+    void everyWriteToTheDirectoryLandsInTheAppendOnlyHistory() {
+        // One connection, so the session's application_name reaches the trigger.
+        JdbcTemplate writable = new JdbcTemplate(new org.springframework.jdbc.datasource.SingleConnectionDataSource(
+            System.getenv("TEST_DB_URL"), PostgresTestDatabase.username(), PostgresTestDatabase.password(), true));
+        writable.execute("set application_name = 'it-history'");
+        writable.update("""
+            insert into sc_of_atm_directory.atm (atm_id, name, status, latitude, longitude, address_line, city,
+              country_code, accessibility, services, currency)
+            values ('IT-HIST-1', 'History ATM', 'InService', 25, 55, 'Road', 'Dubai', 'AE', 'Standard', ARRAY['CashWithdrawal'], 'AED')
+            on conflict (atm_id) do update set status = 'InService'
+            """);
+        writable.update("update sc_of_atm_directory.atm set status = 'OutOfService' where atm_id = 'IT-HIST-1'");
+
+        List<String> trail = writable.queryForList("""
+            select operation || ':' || coalesce(old_row->>'status', '-') || '>' || (new_row->>'status') || ':' || changed_by
+            from sc_of_atm_directory.atm_history where atm_id = 'IT-HIST-1' and application_name = 'it-history'
+            order by history_id
+            """, String.class);
+        assertThat(trail).endsWith("UPDATE:InService>OutOfService:" + PostgresTestDatabase.username());
+        assertThatThrownBy(() -> writable.update("delete from sc_of_atm_directory.atm_history where atm_id = 'IT-HIST-1'"))
+            .hasMessageContaining("append-only");
+        writable.update("delete from sc_of_atm_directory.atm where atm_id = 'IT-HIST-1'");
     }
 
     private static JdbcTemplate writableJdbc() {

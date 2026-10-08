@@ -55,7 +55,14 @@ The service has no write use case today; the network is maintained outside it.
 - The directory survives restarts and scales horizontally; pods are stateless
   and may read from the Aurora reader endpoint.
 - Changing the data needs the import script (or a future write use case), run
-  with the writer credential; the service itself cannot write.
+  as `atm_directory_import` (SELECT/INSERT/UPDATE on `atm`, no DELETE); the
+  service connects as `atm_directory_app` with SELECT only, and only Flyway (the
+  migrate init container) uses the schema owner `atm_directory_migrate`.
+- Every insert and update of `atm` is recorded in the append-only `atm_history`
+  (old and new row, login role from `session_user`, `application_name`, time)
+  by a `SECURITY DEFINER` trigger, so no writer role needs privileges on the
+  history and the history cannot be changed or truncated, even by the owner.
+  Deletes are not recorded: no role except the owner may delete ATMs.
 - Consumers that want change notifications must poll with `If-None-Match`
   until the deferred events exist.
 

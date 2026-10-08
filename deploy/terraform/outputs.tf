@@ -14,8 +14,18 @@ output "reader_jdbc_url" {
 }
 
 output "app_db_secret_name" {
-  description = "Helm value externalSecret.remoteSecretName."
+  description = "Helm value externalSecret.remoteSecretName (runtime role, SELECT only)."
   value       = aws_secretsmanager_secret.app_database.name
+}
+
+output "migrate_db_secret_name" {
+  description = "Helm value externalSecret.migrateRemoteSecretName (schema owner, Flyway only)."
+  value       = aws_secretsmanager_secret.migrate_database.name
+}
+
+output "import_db_secret_name" {
+  description = "Credential of the operator running db/import/import-atms.sh (atm_directory_import)."
+  value       = aws_secretsmanager_secret.import_database.name
 }
 
 output "master_user_secret_arn" {

@@ -53,11 +53,16 @@ config:
   # FLYWAY_URL the writer (output jdbc_url). Empty FLYWAY_URL means "migrate through DB_URL" (single instance).
   DB_URL: ""
   FLYWAY_URL: ""
+  # Runtime role: SELECT on atm only (db/bootstrap/bootstrap-roles.sql, V3__grant_least_privilege.sql).
   DB_USERNAME: atm_directory_app
   DB_POOL_MAX: "5"
   ATM_DIRECTORY_SEED_ENABLED: "false"   # sample ATMs; dev only, never staging/prod
 
-# Database credential, synced from AWS Secrets Manager by External Secrets Operator.
+# Flyway runs in the "migrate" init container as the schema owner.
+migration:
+  username: atm_directory_migrate
+
+# Database credentials, synced from AWS Secrets Manager by External Secrets Operator.
 externalSecret:
   enabled: true
   secretStoreRef:
@@ -65,6 +70,9 @@ externalSecret:
     name: aws-secrets-manager
   # Secrets Manager secret <env>/atm-directory-service/db-app (deploy/terraform output app_db_secret_name).
   remoteSecretName: ""
+  # Secrets Manager secret <env>/atm-directory-service/db-migrate (output migrate_db_secret_name);
+  # only the migrate init container reads it.
+  migrateRemoteSecretName: ""
   refreshInterval: 1h
 
 topologySpread:
