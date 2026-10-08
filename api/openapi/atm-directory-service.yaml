@@ -58,12 +58,19 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '429':
           description: >-
-            Too many requests. Sent by the API gateway (mesh ingress rate limit on this
-            anonymous route), not by the service; retry after the given number of seconds.
+            Too many requests. Sent by the API gateway, not by the service: the mesh ingress
+            rate-limits this anonymous route with a token bucket of 100 requests refilled at
+            50 per second, per gateway pod. Retry after the given number of seconds.
           headers:
             Retry-After:
               schema:
                 type: integer
+            x-fbx-rate-limited:
+              description: Set by the gateway when it rejected the request for the rate limit.
+              schema:
+                type: string
+                enum:
+                  - 'true'
         '503':
           description: Directory store temporarily unavailable; retry after the given number of seconds
           headers:

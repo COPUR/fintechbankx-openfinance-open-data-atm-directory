@@ -25,6 +25,6 @@ class AtmDirectoryOpenApiContractTest {
         String yaml = Files.readString(Path.of("api/openapi/atm-directory-service.yaml"));
         String tooMany = yaml.substring(yaml.indexOf("'429':"), yaml.indexOf("'503':"));
 
-        assertThat(tooMany).contains("API gateway", "Retry-After:");
+        assertThat(tooMany).contains("API gateway", "Retry-After:", "x-fbx-rate-limited:", "- 'true'");
     }
 }
