@@ -43,7 +43,6 @@ autoscaling:
   minReplicas: 3
   maxReplicas: 20
   targetCPUUtilizationPercentage: 60
-  targetMemoryUtilizationPercentage: 80
 
 podDisruptionBudget:
   minAvailable: 2
