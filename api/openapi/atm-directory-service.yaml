@@ -34,7 +34,7 @@ paths:
               schema:
                 type: string
             Cache-Control:
-              description: Public, short-lived cache (for example `max-age=60, public`); revalidate with If-None-Match.
+              description: Always `no-cache`. Any cache may store the response but must revalidate it with If-None-Match before reuse, so a reused response never carries another caller's X-FAPI-Interaction-ID.
               schema:
                 type: string
           content:
@@ -130,6 +130,7 @@ components:
           properties:
             Self:
               type: string
+              description: Relative link to this result (path plus the lat, long and radius that were sent), for example `/open-finance/v1/atms?lat=25.2048&long=55.2708&radius=2.0`. Never contains a host name.
         Meta:
           type: object
           properties:

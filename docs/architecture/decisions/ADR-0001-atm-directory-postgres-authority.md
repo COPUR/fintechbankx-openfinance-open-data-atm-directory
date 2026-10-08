@@ -36,10 +36,14 @@ The service has no write use case today; the network is maintained outside it.
    exists (for example an import endpoint or a status-change command); the
    import script's `version` column is the hook for the future
    `aggregateVersion`.
-5. **Read caching over HTTP, not Redis.** Responses carry a content `ETag`
-   (`If-None-Match` gives `304`) and `Cache-Control: max-age=<ATM_DIRECTORY_CACHE_MAX_AGE>, public`
-   (default 60 s). Gateways, CDNs and clients cache; the platform module is
-   called with `cache_engine = "none"`.
+5. **Read caching over HTTP revalidation, not Redis.** Responses carry a content
+   `ETag` (`If-None-Match` gives a body-less `304`) and `Cache-Control: no-cache`:
+   gateways, CDNs and clients may store a response but revalidate it before every
+   reuse. The monolith sent `max-age=60, public`, which lets a shared cache replay
+   one caller's `X-FAPI-Interaction-ID` to others; the first cut of this service
+   also built `Links.Self` from the request URL, so a forged `X-Forwarded-Host`
+   could poison a cached body. `Links.Self` is relative again, built from the
+   validated query as in the monolith. The platform module is called with `cache_engine = "none"`.
 6. **Security posture unchanged.** The endpoint stays public and
    unauthenticated (`security: []` in the OpenAPI spec, exempt in the FAPI/DPoP
    guard), still requires `X-FAPI-Interaction-ID`, and is reachable only through

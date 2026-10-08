@@ -43,6 +43,6 @@ class AtmDirectoryUatTest {
                 .header("X-FAPI-Interaction-ID", "uat-002"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.Data.ATM[*].AtmId").value(org.hamcrest.Matchers.contains("ATM-001", "ATM-002")))
-            .andExpect(jsonPath("$.Links.Self").value(org.hamcrest.Matchers.endsWith("?lat=25.2048&long=55.2708&radius=25")));
+            .andExpect(jsonPath("$.Links.Self").value("/open-finance/v1/atms?lat=25.2048&long=55.2708&radius=25.0"));
     }
 }

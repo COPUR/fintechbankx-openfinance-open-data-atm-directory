@@ -90,7 +90,7 @@ class AtmDirectoryPostgresIT {
     void radiusSearchOverHttpIsServedFromPostgres() throws Exception {
         mvc.perform(get("/open-finance/v1/atms?lat=25.2048&long=55.2708&radius=25").header("X-FAPI-Interaction-ID", "it-pg-1"))
             .andExpect(status().isOk())
-            .andExpect(header().string("Cache-Control", "max-age=60, public"))
+            .andExpect(header().string("Cache-Control", "no-cache"))
             .andExpect(jsonPath("$.Meta.TotalRecords").value(2))
             .andExpect(jsonPath("$.Data.ATM[*].AtmId").value(contains("ATM-001", "ATM-002")));
 
@@ -119,6 +119,19 @@ class AtmDirectoryPostgresIT {
         assertThatThrownBy(() -> jdbc.update("delete from sc_of_atm_directory.atm where atm_id = 'ATM-003'"))
             .hasMessageContaining("read-only");
         assertThat(directory.findAll()).hasSize(3);
+    }
+
+    @Test
+    void forwardedHostIsNotReflectedThroughTheProductionFilterChain() throws Exception {
+        String body = mvc.perform(get("/open-finance/v1/atms?lat=25.2048&long=55.2708")
+                .header("X-FAPI-Interaction-ID", "it-pg-3")
+                .header("X-Forwarded-Host", "evil.example"))
+            .andExpect(status().isOk())
+            .andExpect(header().string("Cache-Control", "no-cache"))
+            .andExpect(jsonPath("$.Links.Self").value("/open-finance/v1/atms?lat=25.2048&long=55.2708"))
+            .andReturn().getResponse().getContentAsString();
+
+        assertThat(body).doesNotContain("evil.example");
     }
 
     private static JdbcTemplate writableJdbc() {

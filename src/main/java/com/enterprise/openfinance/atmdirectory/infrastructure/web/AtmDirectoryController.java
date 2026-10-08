@@ -4,14 +4,12 @@ import com.enterprise.openfinance.atmdirectory.domain.model.AtmLocation;
 import com.enterprise.openfinance.atmdirectory.domain.port.in.AtmDirectoryUseCase;
 import com.enterprise.openfinance.atmdirectory.domain.query.ListAtmsQuery;
 import com.enterprise.openfinance.atmdirectory.infrastructure.web.dto.AtmListResponse;
-import jakarta.servlet.http.HttpServletRequest;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.time.Duration;
 import java.util.HexFormat;
 import java.util.List;
-import org.springframework.beans.factory.annotation.Value;
+import java.util.StringJoiner;
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -23,27 +21,29 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 public class AtmDirectoryController {
 
-    private final AtmDirectoryUseCase atmDirectoryUseCase;
-    private final CacheControl cacheControl;
+    static final String PATH = "/open-finance/v1/atms";
 
-    public AtmDirectoryController(
-        AtmDirectoryUseCase atmDirectoryUseCase,
-        @Value("${atm-directory.cache.max-age:PT60S}") Duration cacheMaxAge
-    ) {
+    /**
+     * Every cache, shared or private, must revalidate with the ETag before reuse. A
+     * response served from a cache without revalidation would replay another caller's
+     * X-FAPI-Interaction-ID; a 304 from this service carries the caller's own.
+     */
+    private static final CacheControl REVALIDATE = CacheControl.noCache();
+
+    private final AtmDirectoryUseCase atmDirectoryUseCase;
+
+    public AtmDirectoryController(AtmDirectoryUseCase atmDirectoryUseCase) {
         this.atmDirectoryUseCase = atmDirectoryUseCase;
-        // Public open data: shared caches and CDNs may keep it for max-age and revalidate with the ETag.
-        this.cacheControl = CacheControl.maxAge(cacheMaxAge).cachePublic();
     }
 
-    @GetMapping("/open-finance/v1/atms")
+    @GetMapping(PATH)
     public ResponseEntity<AtmListResponse> listAtms(
         @RequestHeader("X-FAPI-Interaction-ID") String interactionId,
         @RequestHeader(value = "If-None-Match", required = false) String ifNoneMatch,
         @RequestHeader(value = "Authorization", required = false) String authorization,
         @RequestParam(value = "lat", required = false) Double lat,
         @RequestParam(value = "long", required = false) Double lon,
-        @RequestParam(value = "radius", required = false) Double radius,
-        HttpServletRequest request
+        @RequestParam(value = "radius", required = false) Double radius
     ) {
         requireInteractionId(interactionId);
         requireSupportedAuthorizationScheme(authorization);
@@ -55,13 +55,13 @@ public class AtmDirectoryController {
                 .header("X-FAPI-Interaction-ID", interactionId)
                 .header("X-OF-Cache", "HIT")
                 .eTag(etag)
-                .cacheControl(cacheControl)
+                .cacheControl(REVALIDATE)
                 .build();
         }
 
         AtmListResponse response = new AtmListResponse(
             new AtmListResponse.DataBlock(atms.stream().map(this::toItem).toList()),
-            new AtmListResponse.LinksBlock(buildSelfLink(request)),
+            new AtmListResponse.LinksBlock(selfLink(lat, lon, radius)),
             new AtmListResponse.MetaBlock(atms.size())
         );
 
@@ -69,7 +69,7 @@ public class AtmDirectoryController {
             .header("X-FAPI-Interaction-ID", interactionId)
             .header("X-OF-Cache", "MISS")
             .eTag(etag)
-            .cacheControl(cacheControl)
+            .cacheControl(REVALIDATE)
             .body(response);
     }
 
@@ -104,10 +104,22 @@ public class AtmDirectoryController {
         );
     }
 
-    private String buildSelfLink(HttpServletRequest request) {
-        String base = request.getRequestURL().toString();
-        String query = request.getQueryString();
-        return query == null ? base : base + "?" + query;
+    /**
+     * Relative link rebuilt from the validated parameters, as the monolith did. Never
+     * derived from the request URL, so Host / X-Forwarded-Host cannot reach the body.
+     */
+    static String selfLink(Double lat, Double lon, Double radius) {
+        StringJoiner query = new StringJoiner("&", "?", "").setEmptyValue("");
+        if (lat != null) {
+            query.add("lat=" + lat);
+        }
+        if (lon != null) {
+            query.add("long=" + lon);
+        }
+        if (radius != null) {
+            query.add("radius=" + radius);
+        }
+        return PATH + query;
     }
 
     static String toEtag(List<AtmLocation> atms) {

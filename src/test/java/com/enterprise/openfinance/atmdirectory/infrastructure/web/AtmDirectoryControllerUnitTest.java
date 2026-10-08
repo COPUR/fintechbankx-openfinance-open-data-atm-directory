@@ -17,14 +17,32 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
+import org.springframework.web.filter.ForwardedHeaderFilter;
+import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.test.web.servlet.MockMvc;
 
-@WebMvcTest(controllers = AtmDirectoryController.class, properties = "atm-directory.cache.max-age=PT120S")
+/**
+ * Web slice with the forwarded-header handling production uses
+ * (server.forward-headers-strategy=framework registers a ForwardedHeaderFilter).
+ */
+@WebMvcTest(controllers = AtmDirectoryController.class)
+@Import(AtmDirectoryControllerUnitTest.ForwardedHeaders.class)
 class AtmDirectoryControllerUnitTest {
 
     private static final AtmLocation DOWNTOWN = new AtmLocation("ATM-001", "Downtown", "InService", 25.2, 55.2,
         "Road 1", "Dubai", "AE", "Wheelchair", List.of("CashWithdrawal"), "AED", Instant.parse("2026-03-01T00:00:00Z"));
+
+    @TestConfiguration
+    static class ForwardedHeaders {
+        @Bean
+        ForwardedHeaderFilter forwardedHeaderFilter() {
+            return new ForwardedHeaderFilter();
+        }
+    }
 
     @Autowired
     private MockMvc mockMvc;
@@ -39,7 +57,7 @@ class AtmDirectoryControllerUnitTest {
         mockMvc.perform(get("/open-finance/v1/atms").header("X-FAPI-Interaction-ID", "it-001"))
             .andExpect(status().isOk())
             .andExpect(header().exists("ETag"))
-            .andExpect(header().string("Cache-Control", "max-age=120, public"))
+            .andExpect(header().string("Cache-Control", "no-cache"))
             .andExpect(header().string("X-FAPI-Interaction-ID", "it-001"))
             .andExpect(jsonPath("$.Data.ATM[0].AtmId").value("ATM-001"))
             .andExpect(jsonPath("$.Data.ATM[0].Currency").value("AED"))
@@ -58,7 +76,7 @@ class AtmDirectoryControllerUnitTest {
                 .header("If-None-Match", etag))
             .andExpect(status().isNotModified())
             .andExpect(header().string("ETag", etag))
-            .andExpect(header().string("Cache-Control", "max-age=120, public"))
+            .andExpect(header().string("Cache-Control", "no-cache"))
             .andExpect(header().string("X-OF-Cache", "HIT"));
     }
 
@@ -162,5 +180,50 @@ class AtmDirectoryControllerUnitTest {
             .andExpect(status().isInternalServerError())
             .andExpect(jsonPath("$.code").value("INTERNAL_ERROR"))
             .andExpect(jsonPath("$.message").value("Internal server error"));
+    }
+    @Test
+    void selfLinkIsRelativeAndBuiltFromTheValidatedQueryLikeTheMonolith() throws Exception {
+        when(atmDirectoryUseCase.listAtms(any())).thenReturn(new AtmListResult(List.of(DOWNTOWN)));
+
+        mockMvc.perform(get("/open-finance/v1/atms?lat=25.2048&long=55.2708&radius=2&utm=x")
+                .header("X-FAPI-Interaction-ID", "it-010"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.Links.Self").value("/open-finance/v1/atms?lat=25.2048&long=55.2708&radius=2.0"));
+
+        mockMvc.perform(get("/open-finance/v1/atms").header("X-FAPI-Interaction-ID", "it-011"))
+            .andExpect(jsonPath("$.Links.Self").value("/open-finance/v1/atms"));
+    }
+
+    @Test
+    void forwardedHostNeverReachesTheBodyOrTheHeaders() throws Exception {
+        when(atmDirectoryUseCase.listAtms(any())).thenReturn(new AtmListResult(List.of(DOWNTOWN)));
+
+        MockHttpServletResponse response = mockMvc.perform(get("/open-finance/v1/atms?lat=25.2048&long=55.2708")
+                .header("X-FAPI-Interaction-ID", "it-012")
+                .header("X-Forwarded-Host", "evil.example")
+                .header("X-Forwarded-Proto", "https")
+                .header("Forwarded", "host=evil.example;proto=https"))
+            .andExpect(status().isOk())
+            .andReturn().getResponse();
+
+        assertThat(response.getContentAsString()).doesNotContain("evil.example");
+        for (String name : response.getHeaderNames()) {
+            assertThat(response.getHeaders(name)).as("header %s", name).noneMatch(value -> value.contains("evil.example"));
+        }
+    }
+
+    @Test
+    void sharedCachesMustRevalidateSoNoCallerGetsAnotherCallersInteractionId() throws Exception {
+        when(atmDirectoryUseCase.listAtms(any())).thenReturn(new AtmListResult(List.of(DOWNTOWN)));
+
+        String etag = mockMvc.perform(get("/open-finance/v1/atms").header("X-FAPI-Interaction-ID", "caller-a"))
+            .andExpect(header().string("Cache-Control", "no-cache"))
+            .andExpect(header().string("X-FAPI-Interaction-ID", "caller-a"))
+            .andReturn().getResponse().getHeader("ETag");
+
+        mockMvc.perform(get("/open-finance/v1/atms").header("X-FAPI-Interaction-ID", "caller-b").header("If-None-Match", etag))
+            .andExpect(status().isNotModified())
+            .andExpect(header().string("Cache-Control", "no-cache"))
+            .andExpect(header().string("X-FAPI-Interaction-ID", "caller-b"));
     }
 }

@@ -79,9 +79,6 @@ atm-directory:
   seed:
     # Loads the sample ATMs in classpath:db/seed. Dev and CI only; never in staging/prod.
     enabled: ${ATM_DIRECTORY_SEED_ENABLED:false}
-  cache:
-    # Cache-Control max-age on GET /open-finance/v1/atms (clients revalidate with the ETag).
-    max-age: ${ATM_DIRECTORY_CACHE_MAX_AGE:PT60S}
 
 logging:
   pattern:

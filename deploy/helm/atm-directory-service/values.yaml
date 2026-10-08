@@ -56,7 +56,6 @@ config:
   DB_USERNAME: atm_directory_app
   DB_POOL_MAX: "5"
   ATM_DIRECTORY_SEED_ENABLED: "false"   # sample ATMs; dev only, never staging/prod
-  ATM_DIRECTORY_CACHE_MAX_AGE: PT60S
 
 # Database credential, synced from AWS Secrets Manager by External Secrets Operator.
 externalSecret:
