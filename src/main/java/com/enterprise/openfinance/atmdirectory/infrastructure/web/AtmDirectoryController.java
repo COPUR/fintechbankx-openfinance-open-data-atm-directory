@@ -8,9 +8,11 @@ import jakarta.servlet.http.HttpServletRequest;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.Duration;
 import java.util.HexFormat;
 import java.util.List;
-import org.springframework.http.HttpHeaders;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -22,9 +24,15 @@ import org.springframework.web.bind.annotation.RestController;
 public class AtmDirectoryController {
 
     private final AtmDirectoryUseCase atmDirectoryUseCase;
+    private final CacheControl cacheControl;
 
-    public AtmDirectoryController(AtmDirectoryUseCase atmDirectoryUseCase) {
+    public AtmDirectoryController(
+        AtmDirectoryUseCase atmDirectoryUseCase,
+        @Value("${atm-directory.cache.max-age:PT60S}") Duration cacheMaxAge
+    ) {
         this.atmDirectoryUseCase = atmDirectoryUseCase;
+        // Public open data: shared caches and CDNs may keep it for max-age and revalidate with the ETag.
+        this.cacheControl = CacheControl.maxAge(cacheMaxAge).cachePublic();
     }
 
     @GetMapping("/open-finance/v1/atms")
@@ -43,7 +51,8 @@ public class AtmDirectoryController {
             return ResponseEntity.status(HttpStatus.NOT_MODIFIED)
                 .header("X-FAPI-Interaction-ID", interactionId)
                 .header("X-OF-Cache", "HIT")
-                .header(HttpHeaders.ETAG, etag)
+                .eTag(etag)
+                .cacheControl(cacheControl)
                 .build();
         }
 
@@ -56,7 +65,8 @@ public class AtmDirectoryController {
         return ResponseEntity.ok()
             .header("X-FAPI-Interaction-ID", interactionId)
             .header("X-OF-Cache", "MISS")
-            .header(HttpHeaders.ETAG, etag)
+            .eTag(etag)
+            .cacheControl(cacheControl)
             .body(response);
     }
 
@@ -72,6 +82,7 @@ public class AtmDirectoryController {
             atm.country(),
             atm.accessibility(),
             atm.services(),
+            atm.currency(),
             atm.updatedAt().toString()
         );
     }
@@ -95,6 +106,7 @@ public class AtmDirectoryController {
                 a.country(),
                 a.accessibility(),
                 String.join(",", a.services()),
+                a.currency(),
                 a.updatedAt().toString()))
             .sorted()
             .reduce("", (x, y) -> x + ";" + y);

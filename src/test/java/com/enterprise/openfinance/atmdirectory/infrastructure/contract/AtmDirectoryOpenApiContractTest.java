@@ -17,5 +17,6 @@ class AtmDirectoryOpenApiContractTest {
         assertThat(yaml).contains("operationId: listAtms");
         assertThat(yaml).contains("security: []");
         assertThat(yaml).contains("X-FAPI-Interaction-ID");
+        assertThat(yaml).contains("Cache-Control:", "Currency:", "'503':", "Retry-After:");
     }
 }
