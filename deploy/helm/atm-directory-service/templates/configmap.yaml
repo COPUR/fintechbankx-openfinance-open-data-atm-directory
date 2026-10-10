@@ -21,6 +21,6 @@ data:
   {{- range $key, $value := .Values.config }}
   {{- /* Empty values are left out so application.yml defaults apply (e.g. FLYWAY_URL falls back to DB_URL). */}}
   {{- if $value }}
-  {{ $key }}: {{ $value | quote }}
+  {{ $key | quote }}: {{ $value | quote }}
   {{- end }}
   {{- end }}
