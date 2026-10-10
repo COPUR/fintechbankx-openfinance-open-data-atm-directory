@@ -1,0 +1,5 @@
+atm_id,name,status,latitude,longitude,address_line,city,country_code,accessibility,services,currency
+ATM-002,Marina ATM,OutOfService,25.0800,55.1400,Dubai Marina Walk,Dubai,AE,Wheelchair,CashWithdrawal,AED
+ATM-003,Abu Dhabi Mall ATM,OutOfService,24.4950,54.3820,Abu Dhabi Mall,Abu Dhabi,AE,Standard,CashWithdrawal,AED
+ATM-101,Business Bay ATM,InService,25.1850,55.2650,"Bay Avenue, Tower B",Dubai,AE,Wheelchair,CashWithdrawal|CashDeposit|ChequeDeposit,AED
+ATM-102,Sharjah Corniche ATM,InService,25.3460,55.3850,Corniche Street,Sharjah,AE,Standard,CashWithdrawal,AED

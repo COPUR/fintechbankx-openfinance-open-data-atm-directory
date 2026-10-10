@@ -43,6 +43,25 @@ Bu repository, FinTechBankX DDD/EDA dönüşümünde **svc-of-atm-directory** se
 - Feature branch kuralı: `codex/<kisa-aciklama>`.
 - Release yaklaşımı: PR + required status checks + tag tabanlı sürümleme.
 
+## Run, test and deploy
+
+| What | Command / path |
+|---|---|
+| Unit and integration tests | `./gradlew check` (PostgreSQL integration tests run when `TEST_DB_URL`, `TEST_DB_USERNAME`, `TEST_DB_PASSWORD` are set; without them they are skipped on a developer machine and fail in CI, i.e. when `CI=true` or `JENKINS_URL` is set) |
+| Run locally | `DB_USERNAME=<owner> SPRING_DATASOURCE_PASSWORD=... ATM_DIRECTORY_SEED_ENABLED=true ./gradlew bootRun` (PostgreSQL `db_of_atm_directory_local`; locally one owner role may run Flyway and the service) |
+| Database roles | `db/bootstrap/bootstrap-roles.sql`: `atm_directory_migrate` (Flyway, init container), `atm_directory_app` (runtime, SELECT only), `atm_directory_import` (import script) |
+| Database migrations | `src/main/resources/db/migration` (schema `sc_of_atm_directory`); sample data in `db/seed` (dev/CI only) |
+| Load the ATM network | `db/import/import-atms.sh "<conninfo as atm_directory_import>" atms.csv` (format: `db/import/example-atms.csv`) |
+| Rehearse migrations and import | `PGHOST=... PGUSER=... PGPASSWORD=... scripts/migration/verify-migration.sh` |
+| Container image | `docker build -t atm-directory-service .` |
+| Kubernetes | `deploy/helm/atm-directory-service` (namespace `open-finance`) |
+| AWS infrastructure | `deploy/terraform` |
+| Extraction runbook | [RUNBOOK-EXTRACT-of-atm-directory](docs/migration/RUNBOOK-EXTRACT-of-atm-directory.md) |
+| Deployment and Well-Architected mapping | [DEPLOYMENT_AND_WELL_ARCHITECTED](docs/architecture/DEPLOYMENT_AND_WELL_ARCHITECTED.md) |
+| Decisions | [ADR-0001 PostgreSQL authority](docs/architecture/decisions/ADR-0001-atm-directory-postgres-authority.md) |
+
+Layout: `domain` (model, query, ports, exception) ← `application` (use case) ← `infrastructure` (web, JPA persistence, Flyway seed config). The service publishes and consumes no events (ADR-0001).
+
 ## Dokümantasyon ve Referanslar
 - [Enterprise Architecture Hub](https://github.com/COPUR/fintechbankx-governance-architecture-enablement-enterprise-architecture)
 - [Secure Microservices Architecture](https://github.com/COPUR/fintechbankx-governance-architecture-enablement-enterprise-architecture/blob/main/docs/architecture/overview/SECURE_MICROSERVICES_ARCHITECTURE.md)

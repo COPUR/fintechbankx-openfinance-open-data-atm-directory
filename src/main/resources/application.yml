@@ -1,0 +1,106 @@
+# svc-of-atm-directory runtime configuration.
+# Every environment-specific value comes from the environment (Helm values,
+# Kubernetes Secret synced from AWS Secrets Manager); nothing secret is here.
+spring:
+  application:
+    name: atm-directory-service
+  threads:
+    virtual:
+      enabled: true
+  lifecycle:
+    timeout-per-shutdown-phase: 25s
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/db_of_atm_directory_local}
+    username: ${DB_USERNAME:atm_directory_app}
+    # The credential is bound from SPRING_DATASOURCE_PASSWORD (Kubernetes Secret
+    # synced from AWS Secrets Manager); it is never written in this file.
+    hikari:
+      schema: sc_of_atm_directory
+      maximum-pool-size: ${DB_POOL_MAX:5}
+      minimum-idle: ${DB_POOL_MIN_IDLE:1}
+      connection-timeout: 3000
+      max-lifetime: 1200000
+      # The service never writes: every pooled session is read-only, including autocommit
+      # statements (pgjdbc readOnlyMode=always). Flyway uses its own connection below.
+      read-only: true
+      data-source-properties:
+        readOnlyMode: always
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        default_schema: sc_of_atm_directory
+        jdbc:
+          time_zone: UTC
+  flyway:
+    schemas: sc_of_atm_directory
+    default-schema: sc_of_atm_directory
+    create-schemas: true
+    locations: classpath:db/migration
+    # The optional db/seed location (repeatable R__ seed) may be switched off after it
+    # was applied once; "*:missing" tolerates that instead of failing validation.
+    ignore-migration-patterns: "*:future,*:missing"
+    # Flyway writes, so it uses its own connection rather than the read-only pool.
+    url: ${FLYWAY_URL:${spring.datasource.url}}
+    user: ${FLYWAY_USER:${spring.datasource.username}}
+    password: ${FLYWAY_PASSWORD:${spring.datasource.password:}}
+    # Names the session in sc_of_atm_directory.atm_history.application_name (seed rows).
+    init-sqls: SET application_name = 'atm-directory-flyway'
+
+openfinance:
+  # Checked at startup under the aws profile (AwsTransportSecurityConfiguration): DB_URL and
+  # FLYWAY_URL each carry exactly one sslmode=verify-full and exactly one sslrootcert equal
+  # to this path. The chart renders DATABASE_CA_BUNDLE from databaseCaBundle.mountPath/key.
+  transport-security:
+    database-ca-bundle: ${DATABASE_CA_BUNDLE:/etc/fintechbankx/rds-ca/global-bundle.pem}
+
+server:
+  port: 8080
+  shutdown: graceful
+  # X-Forwarded-* are not trusted: nothing in a response is built from the request
+  # URL, and the mesh, not the pod, terminates TLS.
+  forward-headers-strategy: none
+
+management:
+  server:
+    port: 8081
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      group:
+        readiness:
+          include: readinessState,db
+        liveness:
+          include: livenessState
+  metrics:
+    tags:
+      service: svc-of-atm-directory
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+  observations:
+    key-values:
+      service: svc-of-atm-directory
+
+atm-directory:
+  snapshot:
+    # Reads and ETag revalidations are served from an in-process snapshot, reloaded on
+    # this interval; an import is visible on every pod within about one interval.
+    refresh-interval: ${ATM_DIRECTORY_SNAPSHOT_REFRESH:PT30S}
+    # If refreshing keeps failing, the last snapshot is served for at most this long;
+    # after that requests reload it themselves and a store outage returns 503.
+    max-age: ${ATM_DIRECTORY_SNAPSHOT_MAX_AGE:PT10M}
+  seed:
+    # Loads the sample ATMs in classpath:db/seed. Dev and CI only; never in staging/prod.
+    enabled: ${ATM_DIRECTORY_SEED_ENABLED:false}
+
+logging:
+  pattern:
+    level: "%5p [${spring.application.name},%X{traceId:-},%X{spanId:-}]"

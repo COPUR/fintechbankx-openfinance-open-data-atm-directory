@@ -1,0 +1,3 @@
+atm_id,name,status,latitude,longitude,address_line,city,country_code,accessibility,services,currency
+ATM-102,Sharjah Corniche ATM,Unavailable,25.3460,55.3850,Corniche Street,Sharjah,AE,Standard,CashWithdrawal,AED
+ATM-900,Broken ATM,InService,95.0000,55.0000,Nowhere,Dubai,AE,Standard,CashWithdrawal,AED

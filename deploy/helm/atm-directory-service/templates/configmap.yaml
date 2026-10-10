@@ -1,0 +1,26 @@
+{{- $_ := required "config.DB_URL is required (terraform output reader_jdbc_url)" .Values.config.DB_URL }}
+{{- /* Aurora's certificate is verified against the platform RDS CA bundle (platform contract,
+       Database CA bundle); DB_URL and FLYWAY_URL (when set) are parsed strictly and nothing
+       else in config may reach the datasource or Flyway (_helpers.tpl). */}}
+{{- $root := printf "%s/%s" .Values.databaseCaBundle.mountPath .Values.databaseCaBundle.key }}
+{{- range $key := list "DB_URL" "FLYWAY_URL" }}
+{{- $url := index $.Values.config $key | default "" }}
+{{- if $url }}
+{{- include "atm.strictJdbcUrl" (dict "key" $key "url" $url "root" $root) }}
+{{- end }}
+{{- end }}
+{{- include "atm.refuseDatasourceOverrides" (dict "config" .Values.config "urlKeys" (list "DB_URL" "FLYWAY_URL")) }}
+{{- include "atm.refuseConfigOverrides" (dict "config" .Values.config "extraEnv" .Values.extraEnv) }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "atm.name" . }}
+  labels:
+    {{- include "atm.labels" . | nindent 4 }}
+data:
+  {{- range $key, $value := .Values.config }}
+  {{- /* Empty values are left out so application.yml defaults apply (e.g. FLYWAY_URL falls back to DB_URL). */}}
+  {{- if $value }}
+  {{ $key | quote }}: {{ $value | quote }}
+  {{- end }}
+  {{- end }}

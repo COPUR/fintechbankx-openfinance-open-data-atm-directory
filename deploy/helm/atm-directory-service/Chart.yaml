@@ -1,0 +1,9 @@
+apiVersion: v2
+name: atm-directory-service
+description: svc-of-atm-directory, the public ATM directory (open data) of FinTechBankX open finance.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+annotations:
+  fintechbankx.io/service-id: svc-of-atm-directory
+  fintechbankx.io/owning-squad: Open Data Squad
