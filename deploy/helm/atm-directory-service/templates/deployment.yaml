@@ -74,6 +74,11 @@ spec:
           env:
             - name: DB_USERNAME
               value: {{ required "migration.username is required" .Values.migration.username | quote }}
+            # Startup TLS assertion (AwsTransportSecurityConfiguration) on the owner connection.
+            - name: SPRING_PROFILES_ACTIVE
+              value: aws
+            - name: DATABASE_CA_BUNDLE
+              value: {{ printf "%s/%s" .Values.databaseCaBundle.mountPath .Values.databaseCaBundle.key | quote }}
             {{- with .Values.config.FLYWAY_URL }}
             - name: DB_URL
               value: {{ . | quote }}
@@ -115,6 +120,11 @@ spec:
             # Migrations ran in the init container; the runtime role may only SELECT.
             - name: SPRING_FLYWAY_ENABLED
               value: "false"
+            # aws runs the startup TLS assertion: DB_URL and FLYWAY_URL verified against DATABASE_CA_BUNDLE.
+            - name: SPRING_PROFILES_ACTIVE
+              value: aws
+            - name: DATABASE_CA_BUNDLE
+              value: {{ printf "%s/%s" .Values.databaseCaBundle.mountPath .Values.databaseCaBundle.key | quote }}
           startupProbe:
             httpGet:
               path: /actuator/health/liveness

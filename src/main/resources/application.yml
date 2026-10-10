@@ -49,6 +49,13 @@ spring:
     # Names the session in sc_of_atm_directory.atm_history.application_name (seed rows).
     init-sqls: SET application_name = 'atm-directory-flyway'
 
+openfinance:
+  # Checked at startup under the aws profile (AwsTransportSecurityConfiguration): DB_URL and
+  # FLYWAY_URL each carry exactly one sslmode=verify-full and exactly one sslrootcert equal
+  # to this path. The chart renders DATABASE_CA_BUNDLE from databaseCaBundle.mountPath/key.
+  transport-security:
+    database-ca-bundle: ${DATABASE_CA_BUNDLE:/etc/fintechbankx/rds-ca/global-bundle.pem}
+
 server:
   port: 8080
   shutdown: graceful

@@ -1,10 +1,14 @@
 package com.enterprise.openfinance.atmdirectory.infrastructure.config;
 
 import org.springframework.beans.factory.config.BeanFactoryPostProcessor;
+import org.springframework.boot.context.properties.bind.Bindable;
+import org.springframework.boot.context.properties.bind.Binder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
 import org.springframework.core.env.Environment;
+
+import java.util.Map;
 
 /**
  * Under the aws profile (the chart renders SPRING_PROFILES_ACTIVE=aws for the migrate
@@ -32,6 +36,14 @@ public class AwsTransportSecurityConfiguration {
     }
 
     static void check(Environment environment) {
-        // red skeleton: no check yet
+        Binder binder = Binder.get(environment);
+        String caBundle = binder.bind(CA_BUNDLE_PROPERTY, String.class).orElse(DEFAULT_CA_BUNDLE);
+        JdbcTlsUrlPolicy.requireVerifiedTls("spring.datasource.url",
+                binder.bind("spring.datasource.url", String.class).orElse(null), caBundle);
+        binder.bind("spring.flyway.url", String.class)
+                .ifBound(url -> JdbcTlsUrlPolicy.requireVerifiedTls("spring.flyway.url", url, caBundle));
+        JdbcTlsUrlPolicy.requireNoTlsDriverProperties("spring.datasource.hikari.data-source-properties",
+                binder.bind("spring.datasource.hikari.data-source-properties",
+                        Bindable.mapOf(String.class, String.class)).orElse(Map.of()));
     }
 }
