@@ -10,6 +10,7 @@
 {{- end }}
 {{- end }}
 {{- include "atm.refuseDatasourceOverrides" (dict "config" .Values.config "urlKeys" (list "DB_URL" "FLYWAY_URL")) }}
+{{- include "atm.refuseConfigOverrides" (dict "config" .Values.config "extraEnv" .Values.extraEnv) }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
