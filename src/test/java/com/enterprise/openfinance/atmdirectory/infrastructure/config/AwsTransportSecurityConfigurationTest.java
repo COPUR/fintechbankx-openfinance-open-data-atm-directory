@@ -2,6 +2,9 @@ package com.enterprise.openfinance.atmdirectory.infrastructure.config;
 
 import org.assertj.core.api.AbstractThrowableAssert;
 import org.junit.jupiter.api.Test;
+import com.zaxxer.hikari.HikariDataSource;
+import org.springframework.boot.autoconfigure.AutoConfigurations;
+import org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration;
 import org.springframework.boot.test.context.ConfigDataApplicationContextInitializer;
 import org.springframework.boot.test.context.assertj.AssertableApplicationContext;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
@@ -13,6 +16,9 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Round 5: under the aws profile the service refuses to start unless the reader (DB_URL)
  * and writer (FLYWAY_URL) JDBC URLs verify Aurora's certificate against the mounted RDS
  * CA bundle. Tests and local runs have no aws profile and still start.
+ * Round 8: registered whatever the profiles (the deployment marker is covered in
+ * AwsTransportSecurityDeploymentMarkerTest), spring.datasource.hikari.jdbc-url and the
+ * effective pool.
  */
 class AwsTransportSecurityConfigurationTest {
 
@@ -41,9 +47,40 @@ class AwsTransportSecurityConfigurationTest {
     }
 
     @Test
-    void doesNothingWithoutTheAwsProfile() {
+    void isRegisteredWithoutTheAwsProfileButDoesNothingWithoutTheDeploymentMarker() {
+        // Round 8: registered whatever the profiles, so a deployment without the aws profile is
+        // still asserted (FBX_DEPLOYED); tests and local runs have neither and start unchanged.
         runner.withPropertyValues("spring.datasource.url=jdbc:postgresql://localhost:5432/db_of_atm_directory_local")
-                .run(context -> assertThat(context).hasNotFailed().doesNotHaveBean("awsTransportSecurityAssertion"));
+                .run(context -> assertThat(context).hasNotFailed()
+                        .hasBean("awsTransportSecurityAssertion").hasBean("awsHikariPoolTlsAssertion"));
+    }
+
+    @Test
+    void refusesAHikariJdbcUrlThatReplacesTheCheckedUrlWithWeakerTls() {
+        // spring.datasource.hikari.jdbc-url is bound onto the pool after spring.datasource.url.
+        aws("spring.datasource.hikari.jdbc-url=" + GOOD + "&sslmode=require")
+                .run(context -> startupFailure(context)
+                        .hasMessageContaining("spring.datasource.hikari.jdbc-url must be")
+                        .hasMessageContaining("sslmode=require is not verify-full"));
+        aws("spring.datasource.hikari.jdbc-url=jdbc:postgresql://elsewhere:5432/x")
+                .run(context -> startupFailure(context)
+                        .hasMessageContaining("spring.datasource.hikari.jdbc-url must be"));
+        aws("spring.datasource.hikari.jdbc-url=" + GOOD)
+                .run(context -> assertThat(context).hasNotFailed());
+    }
+
+    @Test
+    void checksTheEffectivePoolSoADataSourceClassNameCannotBypassTheUrl() {
+        // Hikari ignores jdbcUrl (sslmode included) when a dataSourceClassName is bound.
+        ApplicationContextRunner withPool = new ApplicationContextRunner()
+                .withConfiguration(AutoConfigurations.of(DataSourceAutoConfiguration.class))
+                .withUserConfiguration(AwsTransportSecurityConfiguration.class)
+                .withPropertyValues("spring.profiles.active=aws", "spring.datasource.url=" + GOOD);
+        withPool.run(context -> assertThat(context).hasNotFailed().hasSingleBean(HikariDataSource.class));
+        withPool.withPropertyValues("spring.datasource.hikari.data-source-class-name=org.postgresql.ds.PGSimpleDataSource",
+                        "spring.datasource.hikari.data-source-properties.serverName=elsewhere")
+                .run(context -> startupFailure(context)
+                        .hasMessageContaining("must connect through its verified jdbcUrl, not a dataSourceClassName"));
     }
 
     @Test
