@@ -163,6 +163,29 @@ jobs:
           done
           rm -f override.err
           exit $failed
+      - name: Pods run the aws profile with the mounted RDS CA bundle path (startup TLS assertion)
+        run: |
+          # AwsTransportSecurityConfiguration fails startup under the aws profile unless DB_URL and
+          # FLYWAY_URL verify TLS against DATABASE_CA_BUNDLE (the mounted RDS CA bundle).
+          chart=deploy/helm/atm-directory-service
+          good='jdbc:postgresql://ci:5432/x?sslmode=verify-full&sslrootcert=/etc/fintechbankx/rds-ca/global-bundle.pem'
+          helm template ci "$chart" --namespace open-finance --set image.repository=ci/x --set image.tag=x \
+            --set externalSecret.remoteSecretName=x --set externalSecret.migrationRemoteSecretName=x \
+            --set "config.DB_URL=$good" --set "config.FLYWAY_URL=$good" > profile.yaml
+          python3 - profile.yaml <<'PY'
+          import sys, yaml
+          docs = [d for d in yaml.safe_load_all(open(sys.argv[1])) if d]
+          pod = next(d for d in docs if d["kind"] == "Deployment")["spec"]["template"]["spec"]
+          bundle = "/etc/fintechbankx/rds-ca/global-bundle.pem"
+          for kind, container in (("migrate init container", pod["initContainers"][0]), ("service container", pod["containers"][0])):
+              env = {e["name"]: e.get("value") for e in container.get("env", [])}
+              assert env.get("SPRING_PROFILES_ACTIVE") == "aws", \
+                  f"{kind}: SPRING_PROFILES_ACTIVE must be aws, got {env.get('SPRING_PROFILES_ACTIVE')}"
+              assert env.get("DATABASE_CA_BUNDLE") == bundle, \
+                  f"{kind}: DATABASE_CA_BUNDLE must be {bundle}, got {env.get('DATABASE_CA_BUNDLE')}"
+          print("aws profile and DATABASE_CA_BUNDLE in the migrate init container and the service container")
+          PY
+          rm -f profile.yaml
       - name: Migrate init container and service container mount the platform RDS CA bundle
         run: |
           # ConfigMap rds-ca-bundle, key global-bundle.pem, published by trust-manager (platform contract).
