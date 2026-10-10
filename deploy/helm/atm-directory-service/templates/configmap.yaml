@@ -1,12 +1,15 @@
 {{- $_ := required "config.DB_URL is required (terraform output reader_jdbc_url)" .Values.config.DB_URL }}
-{{- /* Aurora's certificate is verified against the platform RDS CA bundle (platform contract, Database CA bundle). */}}
-{{- $ca := printf "sslrootcert=%s/%s" .Values.databaseCaBundle.mountPath .Values.databaseCaBundle.key }}
+{{- /* Aurora's certificate is verified against the platform RDS CA bundle (platform contract,
+       Database CA bundle); DB_URL and FLYWAY_URL (when set) are parsed strictly and nothing
+       else in config may reach the datasource or Flyway (_helpers.tpl). */}}
+{{- $root := printf "%s/%s" .Values.databaseCaBundle.mountPath .Values.databaseCaBundle.key }}
 {{- range $key := list "DB_URL" "FLYWAY_URL" }}
 {{- $url := index $.Values.config $key | default "" }}
-{{- if and $url (not (and (regexMatch "[?&]sslmode=verify-full(&|$)" $url) (regexMatch (printf "[?&]%s(&|$)" (regexQuoteMeta $ca)) $url))) }}
-{{- fail (printf "config.%s must use sslmode=verify-full&%s (deploy/terraform outputs reader_jdbc_url and jdbc_url)" $key $ca) }}
+{{- if $url }}
+{{- include "atm.strictJdbcUrl" (dict "key" $key "url" $url "root" $root) }}
 {{- end }}
 {{- end }}
+{{- include "atm.refuseDatasourceOverrides" (dict "config" .Values.config "urlKeys" (list "DB_URL" "FLYWAY_URL")) }}
 apiVersion: v1
 kind: ConfigMap
 metadata:

@@ -51,7 +51,10 @@ podDisruptionBudget:
 config:
   # The service only reads: DB_URL is the Aurora reader endpoint (terraform output reader_jdbc_url),
   # FLYWAY_URL the writer (output jdbc_url). Empty FLYWAY_URL means "migrate through DB_URL" (single instance).
-  # Both verify Aurora's certificate against databaseCaBundle; rendering fails otherwise:
+  # Both are parsed strictly (exactly one sslmode=verify-full and one sslrootcert, no other ssl*
+  # key or service), and no spring.datasource.* or spring.flyway.* key (except
+  # SPRING_DATASOURCE_USERNAME), other jdbc: value or JVM options with JDBC, TLS or Spring
+  # properties may be set here. Both verify Aurora's certificate against databaseCaBundle:
   # jdbc:postgresql://<endpoint>:5432/db_of_atm_directory_<env>?sslmode=verify-full&sslrootcert=/etc/fintechbankx/rds-ca/global-bundle.pem
   DB_URL: ""
   FLYWAY_URL: ""
