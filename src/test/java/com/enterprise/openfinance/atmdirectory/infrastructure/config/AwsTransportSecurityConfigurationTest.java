@@ -13,12 +13,10 @@ import org.springframework.core.NestedExceptionUtils;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Round 5: under the aws profile the service refuses to start unless the reader (DB_URL)
- * and writer (FLYWAY_URL) JDBC URLs verify Aurora's certificate against the mounted RDS
- * CA bundle. Tests and local runs have no aws profile and still start.
- * Round 8: registered whatever the profiles (the deployment marker is covered in
- * AwsTransportSecurityDeploymentMarkerTest), spring.datasource.hikari.jdbc-url and the
- * effective pool.
+ * Round 5: the service refuses to start unless the reader (DB_URL) and writer (FLYWAY_URL)
+ * JDBC URLs verify Aurora's certificate against the mounted RDS CA bundle. Round 8: spring.datasource.hikari.jdbc-url and the effective
+ * pool. Guardrail 4a single form: on by default, whatever the profiles
+ * (TlsEnforcementByDefaultTest); these cases run under the chart's profiles.
  */
 class AwsTransportSecurityConfigurationTest {
 
@@ -47,10 +45,11 @@ class AwsTransportSecurityConfigurationTest {
     }
 
     @Test
-    void isRegisteredWithoutTheAwsProfileButDoesNothingWithoutTheDeploymentMarker() {
-        // Round 8: registered whatever the profiles, so a deployment without the aws profile is
-        // still asserted (FBX_DEPLOYED); tests and local runs have neither and start unchanged.
-        runner.withPropertyValues("spring.datasource.url=jdbc:postgresql://localhost:5432/db_of_atm_directory_local")
+    void localRunsAndTestsStartOnlyWithTheSwitchOff() {
+        ApplicationContextRunner local = runner.withPropertyValues(
+                "spring.datasource.url=jdbc:postgresql://localhost:5432/db_of_atm_directory_local");
+        local.run(context -> startupFailure(context).hasMessageContaining("spring.datasource.url must be"));
+        local.withPropertyValues("fintechbankx.tls.enforce=false")
                 .run(context -> assertThat(context).hasNotFailed()
                         .hasBean("awsTransportSecurityAssertion").hasBean("awsHikariPoolTlsAssertion"));
     }
@@ -124,7 +123,8 @@ class AwsTransportSecurityConfigurationTest {
         ApplicationContextRunner shipped = new ApplicationContextRunner()
                 .withInitializer(new ConfigDataApplicationContextInitializer())
                 .withUserConfiguration(AwsTransportSecurityConfiguration.class)
-                .withPropertyValues("spring.profiles.active=aws");
+                // The test resources switch the assertion off; the shipped default is true.
+                .withPropertyValues("spring.profiles.active=aws", "fintechbankx.tls.enforce=true");
         shipped.withPropertyValues("DB_URL=" + GOOD).run(context -> assertThat(context).hasNotFailed());
         shipped.withPropertyValues("DB_URL=" + GOOD, "FLYWAY_URL=" + GOOD.replace("aurora:", "aurora-writer:"))
                 .run(context -> assertThat(context).hasNotFailed());

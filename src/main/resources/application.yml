@@ -49,10 +49,19 @@ spring:
     # Names the session in sc_of_atm_directory.atm_history.application_name (seed rows).
     init-sqls: SET application_name = 'atm-directory-flyway'
 
+fintechbankx:
+  tls:
+    # Startup TLS assertion (guardrail 4a): on. AwsTransportSecurityConfiguration and
+    # HikariPoolTlsAssertion refuse to start unless DB_URL, FLYWAY_URL and the effective pool
+    # verify Aurora's certificate. Only the local profile (application-local.yml) and the test
+    # resources set it false; the chart never does and refuses FINTECHBANKX_TLS_ENFORCE and
+    # the local profile.
+    enforce: true
+
 openfinance:
-  # Checked at startup under the aws profile (AwsTransportSecurityConfiguration): DB_URL and
-  # FLYWAY_URL each carry exactly one sslmode=verify-full and exactly one sslrootcert equal
-  # to this path. The chart renders DATABASE_CA_BUNDLE from databaseCaBundle.mountPath/key.
+  # Checked at startup (fintechbankx.tls.enforce): DB_URL and FLYWAY_URL each carry exactly
+  # one sslmode=verify-full and exactly one sslrootcert equal to this path. The chart renders
+  # DATABASE_CA_BUNDLE from databaseCaBundle.mountPath/key.
   transport-security:
     database-ca-bundle: ${DATABASE_CA_BUNDLE:/etc/fintechbankx/rds-ca/global-bundle.pem}
 

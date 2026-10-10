@@ -7,8 +7,10 @@ value of this chart that feeds one of the guard's routes; a key left out is neve
 - extraEnv: .Values.extraEnv (refused whole by atm.refuseConfigOverrides, the chart renders
   none) plus every env value the templates interpolate from values (DB_USERNAME,
   DATABASE_CA_BUNDLE), so the guard refuses '$(' in them (Kubernetes expands $(VAR) in
-  env[].value). SPRING_PROFILES_ACTIVE (aws) and FBX_DEPLOYED are chart-rendered literals and
-  are not passed: the guard refuses every spring.profiles.* name it is given.
+  env[].value). SPRING_PROFILES_ACTIVE (aws) is a chart-rendered literal and is not passed:
+  the guard refuses every spring.profiles.* name it is given. The startup TLS assertion
+  needs no chart-rendered switch: it is on by default (fintechbankx.tls.enforce, which the
+  guard refuses).
 - envFrom, extraEnvFrom: no such values; mapped so that a value set there (which no template
   renders) is refused rather than ignored.
 - javaToolOptions: the chart has no such value and renders none; a value set there is refused
@@ -126,11 +128,6 @@ spec:
               value: aws
             - name: DATABASE_CA_BUNDLE
               value: {{ printf "%s/%s" .Values.databaseCaBundle.mountPath .Values.databaseCaBundle.key | quote }}
-            # Chart-owned deployment marker (never from values; config.FBX_DEPLOYED is refused):
-            # with it the startup TLS assertion is enforced whatever the profiles, and refuses
-            # to start without the aws profile or with a local profile.
-            - name: FBX_DEPLOYED
-              value: "true"
             {{- with .Values.config.FLYWAY_URL }}
             - name: DB_URL
               value: {{ . | quote }}
@@ -177,11 +174,6 @@ spec:
               value: aws
             - name: DATABASE_CA_BUNDLE
               value: {{ printf "%s/%s" .Values.databaseCaBundle.mountPath .Values.databaseCaBundle.key | quote }}
-            # Chart-owned deployment marker (never from values; config.FBX_DEPLOYED is refused):
-            # with it the startup TLS assertion is enforced whatever the profiles, and refuses
-            # to start without the aws profile or with a local profile.
-            - name: FBX_DEPLOYED
-              value: "true"
           startupProbe:
             httpGet:
               path: /actuator/health/liveness

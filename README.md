@@ -48,7 +48,7 @@ Bu repository, FinTechBankX DDD/EDA dönüşümünde **svc-of-atm-directory** se
 | What | Command / path |
 |---|---|
 | Unit and integration tests | `./gradlew check` (PostgreSQL integration tests run when `TEST_DB_URL`, `TEST_DB_USERNAME`, `TEST_DB_PASSWORD` are set; without them they are skipped on a developer machine and fail in CI, i.e. when `CI=true` or `JENKINS_URL` is set) |
-| Run locally | `DB_USERNAME=<owner> SPRING_DATASOURCE_PASSWORD=... ATM_DIRECTORY_SEED_ENABLED=true ./gradlew bootRun` (PostgreSQL `db_of_atm_directory_local`; locally one owner role may run Flyway and the service) |
+| Run locally | `SPRING_PROFILES_ACTIVE=local DB_USERNAME=<owner> SPRING_DATASOURCE_PASSWORD=... ATM_DIRECTORY_SEED_ENABLED=true ./gradlew bootRun` (PostgreSQL `db_of_atm_directory_local`; locally one owner role may run Flyway and the service). The startup TLS assertion is on by default (`fintechbankx.tls.enforce`: DB_URL and FLYWAY_URL `sslmode=verify-full` with the RDS CA bundle); only the `local` profile and the test resources switch it off, and the chart refuses both |
 | Database roles | `db/bootstrap/bootstrap-roles.sql`: `atm_directory_migrate` (Flyway, init container), `atm_directory_app` (runtime, SELECT only), `atm_directory_import` (import script) |
 | Database migrations | `src/main/resources/db/migration` (schema `sc_of_atm_directory`); sample data in `db/seed` (dev/CI only) |
 | Load the ATM network | `db/import/import-atms.sh "<conninfo as atm_directory_import>" atms.csv` (format: `db/import/example-atms.csv`) |
