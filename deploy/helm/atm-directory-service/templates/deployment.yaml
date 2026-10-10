@@ -79,6 +79,11 @@ spec:
               value: aws
             - name: DATABASE_CA_BUNDLE
               value: {{ printf "%s/%s" .Values.databaseCaBundle.mountPath .Values.databaseCaBundle.key | quote }}
+            # Chart-owned deployment marker (never from values; config.FBX_DEPLOYED is refused):
+            # with it the startup TLS assertion is enforced whatever the profiles, and refuses
+            # to start without the aws profile or with a local profile.
+            - name: FBX_DEPLOYED
+              value: "true"
             {{- with .Values.config.FLYWAY_URL }}
             - name: DB_URL
               value: {{ . | quote }}
@@ -125,6 +130,11 @@ spec:
               value: aws
             - name: DATABASE_CA_BUNDLE
               value: {{ printf "%s/%s" .Values.databaseCaBundle.mountPath .Values.databaseCaBundle.key | quote }}
+            # Chart-owned deployment marker (never from values; config.FBX_DEPLOYED is refused):
+            # with it the startup TLS assertion is enforced whatever the profiles, and refuses
+            # to start without the aws profile or with a local profile.
+            - name: FBX_DEPLOYED
+              value: "true"
           startupProbe:
             httpGet:
               path: /actuator/health/liveness
