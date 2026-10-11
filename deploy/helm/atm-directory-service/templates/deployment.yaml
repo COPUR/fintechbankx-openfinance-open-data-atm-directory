@@ -1,6 +1,7 @@
 {{- /*
-Platform datasource/TLS guard, vendored unchanged as _fbx_helpers.tpl (source, commit, path and sha256 in
-its header; platform chart README, "Vendoring the guard"). The adapter maps every
+Platform datasource/TLS guard, vendored whole and unchanged, without a header, as _fbx_helpers.tpl
+(source repository, path, commit and sha256 are pinned in CI next to
+scripts/ci/verify-vendored-guard.sh; platform chart README, "Vendoring the guard"). The adapter maps every
 value of this chart that feeds one of the guard's routes; a key left out is never checked:
 - config: .Values.config (ConfigMap, envFrom of the migrate init container and the service;
   config.FLYWAY_URL is also the init container's DB_URL, checked here as config.FLYWAY_URL).
@@ -18,8 +19,9 @@ value of this chart that feeds one of the guard's routes; a key left out is neve
   JDK_JAVA_OPTIONS and _JAVA_OPTIONS.
 - externalSecret.data / extraData as values: the chart renders its own entries only; a value
   set there is refused below rather than ignored.
-- databaseCa: databaseCaBundle, always mounted (enabled), so every JDBC URL must carry
-  sslrootcert=<mountPath>/<key>.
+- databaseCa: databaseCaBundle (mountPath, key, configMapName: the values the pods mount),
+  always mounted (enabled); the guard pins them to /etc/fintechbankx/rds-ca, global-bundle.pem
+  and rds-ca-bundle, and every JDBC URL must carry sslrootcert=<mountPath>/<key>.
 - kafka.runtime: "" (the service has no Kafka client; a Kafka protocol key in config then
   fails the render).
 - externalSecret: data = the entries externalsecret.yaml renders (db and db-migration),
@@ -43,7 +45,8 @@ value of this chart that feeds one of the guard's routes; a key left out is neve
       "envFrom" .Values.envFrom
       "extraEnvFrom" .Values.extraEnvFrom
       "javaToolOptions" ""
-      "databaseCa" (dict "enabled" true "mountPath" .Values.databaseCaBundle.mountPath "key" .Values.databaseCaBundle.key)
+      "databaseCa" (dict "enabled" true "mountPath" .Values.databaseCaBundle.mountPath "key" .Values.databaseCaBundle.key
+        "configMapName" .Values.databaseCaBundle.configMapName)
       "kafka" (dict "runtime" "")
       "externalSecret" (dict "enabled" true "data" ($secrets.data | default list)
         "dataFrom" (concat ($secrets.dataFrom | default list) (.Values.externalSecret.dataFrom | default list))))) -}}
