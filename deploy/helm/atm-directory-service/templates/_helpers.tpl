@@ -16,9 +16,16 @@ the guard never sees. Every template writes it quoted as well.
 {{- $ns -}}
 {{- end -}}
 
+{{/*
+Selector labels: the serving pod carries app.kubernetes.io/component=service (the platform mesh grants
+egress by that label, cicd-templates 335a345) and every selector (Deployment, topology spread, Service,
+PDB, NetworkPolicy) includes it. A Deployment selector is immutable: a release installed before this
+label would need delete-and-recreate (the chart has never been released).
+*/}}
 {{- define "atm.selectorLabels" -}}
 app.kubernetes.io/name: {{ include "atm.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
+app.kubernetes.io/component: service
 {{- end -}}
 
 {{- define "atm.labels" -}}
@@ -213,4 +220,19 @@ Arguments: dict "root" (.), "template" (file name under templates/). Returns YAM
 {{- end -}}
 {{- end -}}
 {{- toYaml (dict "data" $data "dataFrom" $dataFrom) -}}
+{{- end -}}
+
+{{/*
+The image reference "<image.repository>:<image.tag>". image.tag is the immutable tag the pipeline
+built (the git SHA): it has no default (empty fails as required), and "latest" in any case is refused,
+since a mutable tag lets a restarted pod run another build than the one released. The chart takes no
+digest.
+*/}}
+{{- define "atm.image" -}}
+{{- $repository := required "image.repository is required" .Values.image.repository -}}
+{{- $tag := toString (required "image.tag is required" .Values.image.tag) -}}
+{{- if eq (lower (trim $tag)) "latest" -}}
+{{- fail (printf "image.tag %q is refused: use the immutable tag the pipeline built (the git SHA); a mutable tag lets a restarted pod run another build than the one released" $tag) -}}
+{{- end -}}
+{{- printf "%s:%s" $repository $tag -}}
 {{- end -}}
