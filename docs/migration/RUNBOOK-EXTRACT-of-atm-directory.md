@@ -65,7 +65,7 @@ verification is a stop: do not fall back to `sslmode=require`.
    `sc_of_atm_directory` and exits; the service container starts with Flyway off.
 3. Export the network from the ATM operations source as CSV with the header in
    `db/import/example-atms.csv`, then from a host inside the VPC:
-   `PGPASSWORD=... db/import/import-atms.sh "host=<writer> dbname=db_of_atm_directory_<env> user=atm_directory_import sslmode=verify-full sslrootcert=$HOME/rds-ca/global-bundle.pem" atms.csv`
+   `PGPASSWORD=<password> db/import/import-atms.sh "host=<writer> dbname=db_of_atm_directory_<env> user=atm_directory_import sslmode=verify-full sslrootcert=$HOME/rds-ca/global-bundle.pem" atms.csv`
 4. Verify: the script prints rows in file / inserted / updated / unchanged; a
    second run must print `0 | 0 | <n>` unchanged. Each pod serves an in-process
    snapshot reloaded every 30 s (`ATM_DIRECTORY_SNAPSHOT_REFRESH`), so wait one

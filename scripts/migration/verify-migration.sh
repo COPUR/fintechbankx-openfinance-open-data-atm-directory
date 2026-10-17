@@ -33,14 +33,14 @@ as_role() {
     atm_directory_app) pw="$pw_app" ;;
     atm_directory_import) pw="$pw_import" ;;
   esac
-  PGUSER="$role" PGPASSWORD="$pw" PGOPTIONS="-c search_path=$schema" psql_q -d "$db" "$@"
+  PGUSER="$role" PGPASSWORD="${pw}" PGOPTIONS="-c search_path=$schema" psql_q -d "$db" "$@"
 }
 # Flyway labels its session atm-directory-flyway (spring.flyway.init-sqls).
 in_schema() { PGAPPNAME=atm-directory-flyway as_role atm_directory_migrate "$@"; }
 # import_as [options...] <csv>: run the import as atm_directory_import.
 import_as() {
   local csv="${*: -1}"
-  PGUSER=atm_directory_import PGPASSWORD="$pw_import" "$root/db/import/import-atms.sh" "${@:1:$#-1}" "dbname=$db" "$csv"
+  PGUSER=atm_directory_import PGPASSWORD="${pw_import}" "$root/db/import/import-atms.sh" "${@:1:$#-1}" "dbname=$db" "$csv"
 }
 
 psql_q -d postgres -c "DROP DATABASE IF EXISTS $db" -c "CREATE DATABASE $db"
