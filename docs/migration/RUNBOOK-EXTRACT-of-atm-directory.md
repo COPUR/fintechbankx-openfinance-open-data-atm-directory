@@ -150,7 +150,7 @@ Responses are **not** identical to the monolith's:
 
 There is no route back to the monolith. Roll back to the previous good state:
 
-- **Bad release:** `helm rollback atm-directory-service <previous revision> -n open-finance`.
+- **Bad release:** `HELM_DRIVER=configmap helm rollback atm-directory-service <previous revision> -n open-finance`.
   Migrations are additive, so the previous image runs on the current schema.
 - **Bad data:** re-import the previous signed-off file with `--full`
   (`atm_history` shows what the bad import changed).

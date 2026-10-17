@@ -77,7 +77,7 @@ spec:
         {{- include "atm.selectorLabels" . | nindent 8 }}
         {{- toYaml .Values.podLabels | nindent 8 }}
         app: {{ include "atm.name" . }}
-        version: {{ .Values.image.tag | quote }}
+        version: {{ .Values.image.tag | default .Chart.AppVersion | quote }}
         sidecar.istio.io/inject: {{ .Values.mesh.sidecarInject | quote }}
       annotations:
         sidecar.istio.io/inject: {{ .Values.mesh.sidecarInject | quote }}
