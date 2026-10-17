@@ -1,0 +1,10 @@
+.git
+.github
+.gradle
+**/build
+docs
+deploy
+db
+api
+scripts
+*.md

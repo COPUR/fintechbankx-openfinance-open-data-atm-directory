@@ -1,55 +1,48 @@
 package com.enterprise.openfinance.atmdirectory.infrastructure.functional;
 
-import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.enterprise.openfinance.atmdirectory.infrastructure.web.dto.AtmListResponse;
+import com.enterprise.openfinance.atmdirectory.infrastructure.config.AtmDirectoryConfiguration;
+import com.enterprise.openfinance.atmdirectory.infrastructure.web.AtmDirectoryController;
+import com.enterprise.openfinance.atmdirectory.support.InMemoryAtmDirectoryAdapter;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.web.client.TestRestTemplate;
-import org.springframework.boot.test.web.server.LocalServerPort;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.ResponseEntity;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.context.annotation.Import;
+import org.springframework.test.web.servlet.MockMvc;
 
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+/** Web layer and use case together over the sample directory, no database. */
+@WebMvcTest(controllers = AtmDirectoryController.class)
+@Import({AtmDirectoryConfiguration.class, InMemoryAtmDirectoryAdapter.class})
 class AtmDirectoryUatTest {
 
-    @LocalServerPort
-    private int port;
-
     @Autowired
-    private TestRestTemplate restTemplate;
+    private MockMvc mockMvc;
 
     @Test
-    void shouldSupportEtagNotModifiedForRepeatedAtmQueries() {
-        HttpHeaders headers = new HttpHeaders();
-        headers.add("X-FAPI-Interaction-ID", "uat-001");
+    void shouldSupportEtagNotModifiedForRepeatedAtmQueries() throws Exception {
+        String etag = mockMvc.perform(get("/open-finance/v1/atms").header("X-FAPI-Interaction-ID", "uat-001"))
+            .andExpect(status().isOk())
+            .andExpect(header().string("X-OF-Cache", "MISS"))
+            .andExpect(jsonPath("$.Meta.TotalRecords").value(3))
+            .andReturn().getResponse().getHeader("ETag");
 
-        ResponseEntity<AtmListResponse> first = restTemplate.exchange(
-            "http://localhost:" + port + "/open-finance/v1/atms",
-            HttpMethod.GET,
-            new HttpEntity<>(headers),
-            AtmListResponse.class
-        );
+        mockMvc.perform(get("/open-finance/v1/atms")
+                .header("X-FAPI-Interaction-ID", "uat-001")
+                .header("If-None-Match", etag))
+            .andExpect(status().isNotModified())
+            .andExpect(header().string("X-OF-Cache", "HIT"));
+    }
 
-        assertThat(first.getStatusCode().value()).isEqualTo(200);
-        String etag = first.getHeaders().getETag();
-        assertThat(etag).isNotBlank();
-
-        HttpHeaders secondHeaders = new HttpHeaders();
-        secondHeaders.add("X-FAPI-Interaction-ID", "uat-001");
-        secondHeaders.add("If-None-Match", etag);
-
-        ResponseEntity<String> second = restTemplate.exchange(
-            "http://localhost:" + port + "/open-finance/v1/atms",
-            HttpMethod.GET,
-            new HttpEntity<>(secondHeaders),
-            String.class
-        );
-
-        assertThat(second.getStatusCode().value()).isEqualTo(304);
-        assertThat(second.getHeaders().getFirst("X-OF-Cache")).isEqualTo("HIT");
+    @Test
+    void radiusSearchAroundDowntownDubaiFindsDowntownAndMarina() throws Exception {
+        mockMvc.perform(get("/open-finance/v1/atms?lat=25.2048&long=55.2708&radius=25")
+                .header("X-FAPI-Interaction-ID", "uat-002"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.Data.ATM[*].AtmId").value(org.hamcrest.Matchers.contains("ATM-001", "ATM-002")))
+            .andExpect(jsonPath("$.Links.Self").value("/open-finance/v1/atms?lat=25.2048&long=55.2708&radius=25.0"));
     }
 }

@@ -21,6 +21,7 @@ public record AtmListResponse(
         @JsonProperty("Country") String country,
         @JsonProperty("Accessibility") String accessibility,
         @JsonProperty("Services") List<String> services,
+        @JsonProperty("Currency") String currency,
         @JsonProperty("UpdatedAt") String updatedAt
     ) {}
 

@@ -3,7 +3,12 @@ package com.enterprise.openfinance.atmdirectory.domain.model;
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
+import java.util.regex.Pattern;
 
+/**
+ * One ATM of the bank's network as published in the open-data directory.
+ * Public reference data: no customer data is attached to it.
+ */
 public record AtmLocation(
     String atmId,
     String name,
@@ -15,8 +20,17 @@ public record AtmLocation(
     String country,
     String accessibility,
     List<String> services,
+    String currency,
     Instant updatedAt
 ) {
+    /**
+     * Status of an ATM that left the network: set by a full import for every ATM missing
+     * from the signed-off file. A withdrawn ATM is kept for history but never listed.
+     */
+    public static final String STATUS_WITHDRAWN = "Withdrawn";
+
+    private static final Pattern ISO_4217 = Pattern.compile("[A-Z]{3}");
+
     public AtmLocation {
         requireNonBlank(atmId, "atmId");
         requireNonBlank(name, "name");
@@ -25,9 +39,13 @@ public record AtmLocation(
         requireNonBlank(city, "city");
         requireNonBlank(country, "country");
         requireNonBlank(accessibility, "accessibility");
-        services = List.copyOf(services);
-        if (services.isEmpty()) {
-            throw new IllegalArgumentException("services must not be empty");
+        Coordinates.requireValid(latitude, longitude);
+        services = List.copyOf(Objects.requireNonNull(services, "services must not be null"));
+        if (services.isEmpty() || services.stream().anyMatch(service -> service == null || service.isBlank())) {
+            throw new IllegalArgumentException("services must contain at least one non-blank service");
+        }
+        if (currency == null || !ISO_4217.matcher(currency).matches()) {
+            throw new IllegalArgumentException("currency must be an ISO 4217 code, got '" + currency + "'");
         }
         Objects.requireNonNull(updatedAt, "updatedAt must not be null");
     }

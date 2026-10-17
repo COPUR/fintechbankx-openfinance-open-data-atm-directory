@@ -1,0 +1,38 @@
+output "workload_role_arn" {
+  description = "IRSA role for the Helm value serviceAccount.roleArn."
+  value       = aws_iam_role.workload.arn
+}
+
+output "jdbc_url" {
+  description = "Writer endpoint: Helm value config.FLYWAY_URL and the import script's host. TLS with server-certificate and host-name verification against the RDS CA bundle the chart mounts from the platform ConfigMap rds-ca-bundle."
+  value       = "jdbc:postgresql://${aws_rds_cluster.database.endpoint}:5432/${local.database}?sslmode=verify-full&sslrootcert=/etc/fintechbankx/rds-ca/global-bundle.pem"
+}
+
+output "reader_jdbc_url" {
+  description = "Reader endpoint: Helm value config.DB_URL (the service only reads). TLS verified against the same mounted RDS CA bundle."
+  value       = "jdbc:postgresql://${aws_rds_cluster.database.reader_endpoint}:5432/${local.database}?sslmode=verify-full&sslrootcert=/etc/fintechbankx/rds-ca/global-bundle.pem"
+}
+
+output "app_db_secret_name" {
+  description = "Helm value externalSecret.remoteSecretName (runtime role, SELECT only)."
+  value       = aws_secretsmanager_secret.app_database.name
+}
+
+output "migration_db_secret_name" {
+  description = "Helm value externalSecret.migrationRemoteSecretName (schema owner, Flyway only)."
+  value       = aws_secretsmanager_secret.migration_database.name
+}
+
+output "import_db_secret_name" {
+  description = "Credential of the operator running db/import/import-atms.sh (atm_directory_import)."
+  value       = aws_secretsmanager_secret.import_database.name
+}
+
+output "master_user_secret_arn" {
+  description = "RDS-managed admin credential, for the DBA bootstrap only."
+  value       = aws_rds_cluster.database.master_user_secret[0].secret_arn
+}
+
+output "log_group_name" {
+  value = module.service_base.cloudwatch_log_group_name
+}
