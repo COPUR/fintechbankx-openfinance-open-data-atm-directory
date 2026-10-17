@@ -3,17 +3,13 @@
 {{- end -}}
 
 {{/*
-The namespace every document is written to: .Values.namespace, else the release namespace.
-It must be an RFC 1123 DNS label, as Kubernetes requires, so a value holding a newline or a
-"---" document separator fails the render instead of closing its line and adding documents
-the guard never sees. Every template writes it quoted as well.
+No template writes metadata.namespace: the release namespace (--namespace) places every document.
+A namespace value would be ignored, so it fails the render instead.
 */}}
-{{- define "atm.namespace" -}}
-{{- $ns := toString (.Values.namespace | default .Release.Namespace) -}}
-{{- if not (regexMatch "^[a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?$" $ns) -}}
-{{- fail (printf "namespace must be an RFC 1123 DNS label (lower-case letters, digits and '-', at most 63 characters, starting and ending with a letter or digit), got %q" $ns) -}}
+{{- define "atm.refuseNamespaceValue" -}}
+{{- if hasKey .Values "namespace" -}}
+{{- fail "namespace is not a value of this chart: install with --namespace (the release namespace places every document)" -}}
 {{- end -}}
-{{- $ns -}}
 {{- end -}}
 
 {{/*

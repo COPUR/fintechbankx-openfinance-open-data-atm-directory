@@ -410,37 +410,33 @@ jobs:
           PY
           rm -rf "$work" guard.err
           exit $failed
-      - name: Namespace is an RFC 1123 DNS label, and a valid render writes exactly the default documents
+      - name: No document writes a namespace, and a valid render writes exactly the default documents
         run: |
-          # Every template writes the namespace through atm.namespace, quoted, and the helper fails the render
-          # unless it is an RFC 1123 DNS label: a "---" separator or a newline cannot close the line and add
-          # documents (a Pod) that the guard never sees.
+          # No template writes metadata.namespace: the release namespace places every document, so a hostile
+          # release namespace (a "---" separator or a newline) has no line to close and adds no document the
+          # guard never sees. A namespace value would be ignored, so the chart refuses it.
           chart=deploy/helm/atm-directory-service
           good='jdbc:postgresql://ci:5432/x?sslmode=verify-full&sslrootcert=/etc/fintechbankx/rds-ca/global-bundle.pem'
           args="--namespace open-finance --set image.repository=ci/x --set image.tag=x --set externalSecret.remoteSecretName=x --set externalSecret.migrationRemoteSecretName=x --set config.DB_URL=$good"
-          work="$(mktemp -d)"
-          ns_fail() {  # <description> <helm args...>
-            local desc="$1"; shift
-            if out="$(helm template ci "$chart" $args "$@" 2>&1)"; then echo "$desc must be refused"; exit 1; fi
-            grep -qF 'namespace must be an RFC 1123 DNS label' <<< "$out" || { echo "$desc failed for another reason: $out"; exit 1; }
-            echo "refused as expected: $desc"
-          }
-          separator=$'open-finance\n---\napiVersion: v1\nkind: Pod\nmetadata:\n  name: injected\nspec:\n  containers: [{name: x, image: x}]'
-          newline=$'open-finance\n  annotations: {x: y}'
-          printf 'namespace: "open-finance\\n---\\napiVersion: v1\\nkind: Pod\\nmetadata:\\n  name: injected\\nspec:\\n  containers: [{name: x, image: x}]"\n' > "$work/ns-separator.yaml"
-          printf 'namespace: "open-finance\\n  annotations: {x: y}"\n' > "$work/ns-newline.yaml"
-          ns_fail "values namespace with a --- document separator" -f "$work/ns-separator.yaml"
-          ns_fail "values namespace with a newline" -f "$work/ns-newline.yaml"
-          ns_fail "release namespace with a --- document separator" --set namespace= --namespace "$separator"
-          ns_fail "release namespace with a newline" --set namespace= --namespace "$newline"
-          # A valid render writes exactly the documents of the default values (count and kinds), so a line a
-          # later change leaves unquoted cannot add a document the guard never sees.
           docs() { python3 -c 'import collections, sys, yaml; c = collections.Counter(str(d.get("kind")) if isinstance(d, dict) else "<not a mapping>" for d in yaml.safe_load_all(sys.stdin) if d is not None); print(" ".join(f"{k}={n}" for k, n in sorted(c.items())))'; }
           want="ConfigMap=1 Deployment=1 ExternalSecret=2 HorizontalPodAutoscaler=1 PodDisruptionBudget=1 Service=1 ServiceAccount=1"
+          if out="$(helm template ci "$chart" $args --set namespace=open-finance 2>&1)"; then echo "a namespace value must be refused"; exit 1; fi
+          grep -qF 'namespace is not a value of this chart' <<< "$out" || { echo "a namespace value failed for another reason: $out"; exit 1; }
+          echo "refused as expected: a namespace value"
+          separator=$'open-finance\n---\napiVersion: v1\nkind: Pod\nmetadata:\n  name: injected\nspec:\n  containers: [{name: x, image: x}]'
+          newline=$'open-finance\n  annotations: {x: y}'
+          for ns in "$separator" "$newline"; do
+            rendered="$(helm template ci "$chart" $args --namespace "$ns")"
+            got="$(docs <<< "$rendered")"
+            [ "$got" = "$want" ] || { echo "a hostile release namespace changed the documents: got [$got], want [$want]"; exit 1; }
+            python3 -c 'import sys, yaml; bad = [d["kind"] for d in yaml.safe_load_all(sys.stdin) if d and "namespace" in d.get("metadata", {})]; sys.exit(f"documents write metadata.namespace: {bad}" if bad else 0)' <<< "$rendered"
+          done
+          echo "a hostile release namespace adds no document and no document writes metadata.namespace"
+          # A valid render writes exactly the documents of the default values (count and kinds), so a line a
+          # later change leaves unquoted cannot add a document the guard never sees.
           got="$(helm template ci "$chart" $args | docs)"
           [ "$got" = "$want" ] || { echo "rendered documents differ from the default set: got [$got], want [$want]"; exit 1; }
           echo "the default render writes exactly: $got"
-          rm -rf "$work"
       - name: Platform guard 6b6c317 refuses database CA, Kafka client TLS, Secret-only, DocumentDB and property-reading names
         run: |
           # Platform guard 6b6c317 (README "Vendoring the guard", step 4): the database CA mount pinned

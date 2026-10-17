@@ -27,8 +27,8 @@ value of this chart that feeds one of the guard's routes; a key left out is neve
 - externalSecret: data = the entries externalsecret.yaml renders (db and db-migration),
   dataFrom = any dataFrom it renders plus .Values.externalSecret.dataFrom (refused).
 */ -}}
-{{- /* values namespace: an RFC 1123 DNS label (atm.namespace), though no document writes it; the release namespace places them */ -}}
-{{- $_ := include "atm.namespace" . -}}
+{{- /* A namespace value is refused (atm.refuseNamespaceValue): the release namespace places every document */ -}}
+{{- $_ := include "atm.refuseNamespaceValue" . -}}
 {{- $env := list
       (dict "name" "DB_USERNAME" "value" (toString .Values.migration.username))
       (dict "name" "DATABASE_CA_BUNDLE" "value" (printf "%s/%s" .Values.databaseCaBundle.mountPath .Values.databaseCaBundle.key)) -}}

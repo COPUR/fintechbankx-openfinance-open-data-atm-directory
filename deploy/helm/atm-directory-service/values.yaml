@@ -1,9 +1,9 @@
 # Defaults are production-shaped (multi-replica, spread across zones).
 # Override per environment with values-<env>.yaml.
 
-# Platform contract: every svc-of-* service runs in the open-finance namespace
-# (install with --namespace open-finance); the chart renders into .Release.Namespace.
-namespace: open-finance
+# Platform contract: every svc-of-* service runs in the open-finance namespace. Install with
+# --namespace open-finance: the release namespace places every document, and no template writes
+# metadata.namespace, so there is no namespace value (setting one fails the render).
 
 image:
   repository: ""   # e.g. <account>.dkr.ecr.<region>.amazonaws.com/fintechbankx/atm-directory-service
