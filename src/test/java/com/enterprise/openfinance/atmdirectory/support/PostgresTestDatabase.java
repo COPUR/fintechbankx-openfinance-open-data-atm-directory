@@ -60,7 +60,7 @@ public final class PostgresTestDatabase {
     }
 
     public static String password() {
-        return env("TEST_DB_PASSWORD", "atm_test");
+        return env("TEST_DB_PASSWORD", "");
     }
 
     private static String env(String name, String fallback) {
